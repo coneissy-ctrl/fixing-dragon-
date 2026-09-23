@@ -66,7 +66,15 @@ services:
         value: "1"
       - key: DRAGON_BASE_VENUES
         value: "Aerodrome,Uniswap_V3"
-      - key: DEX_UNIVERSE_REFRESH_SECONDS\n        value: "300"\n      - key: DEX_UNIVERSE_MAX_TOKENS\n        value: "100"\n      - key: DEX_UNIVERSE_LOOKBACK_BLOCKS\n        value: "80000"\n      - key: DEX_UNIVERSE_CHUNK_BLOCKS\n        value: "2000"\n      - key: TRIANGULAR_ARBITRAGE_ENABLED
+      - key: DEX_UNIVERSE_REFRESH_SECONDS
+        value: "300"
+      - key: DEX_UNIVERSE_MAX_TOKENS
+        value: "100"
+      - key: DEX_UNIVERSE_LOOKBACK_BLOCKS
+        value: "80000"
+      - key: DEX_UNIVERSE_CHUNK_BLOCKS
+        value: "2000"
+      - key: TRIANGULAR_ARBITRAGE_ENABLED
         value: "false"
       - key: DRAGON_CHALLENGE_GAS_BPS
         value: "2000"
