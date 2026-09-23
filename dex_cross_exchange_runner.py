@@ -475,7 +475,7 @@ def _triangular_tokens_for(chain_id: int) -> tuple[str, str, str] | None:
     return None
 
 async def scan_triangular_chain(adapter, chain_id, *, max_quote, min_profit):
-    if not env_bool("TRIANGULAR_ARBITRAGE_ENABLED", True): return [], {}
+    return [], {"triangular_disabled": 1}
     cycle = _triangular_tokens_for(chain_id)
     if cycle is None: return [], {"triangular_cycle_not_configured": 1}
     configured_venues = [x.strip() for x in os.getenv("DRAGON_BASE_VENUES", "").split(",") if x.strip()]
@@ -808,7 +808,7 @@ async def scan_evm_chain(adapter, chain_id, *, max_quote, taker, slippage, min_p
     quote_token, quote_decimals = _quote_token_for(chain_id)
     base_tokens = _base_tokens_for(chain_id)
     if int(chain_id) == 8453:
-        base_tokens = BASE_UNIVERSE.tokens(adapter, quote_token, base_tokens)
+        # Universe refresh performs block-log discovery. Keep it off the async event loop\n        # so a slow/dead RPC can never stall the live quote scanner.\n        base_tokens = await to_thread(BASE_UNIVERSE.tokens, adapter, quote_token, base_tokens)
     venue_names = configured_base_venues(chain_id)
     flash_enabled = env_bool("FLASH_LOAN_ENABLED", True)
     configured_fee_bps = env_decimal("FLASH_LOAN_FEE_BPS", "0")
@@ -904,7 +904,7 @@ async def main():
             raise ValueError("DEX_MIN_NET_PROFIT_FLOOR cannot be below 0.002")
         dynamic_profit = env_bool("DEX_DYNAMIC_MIN_PROFIT", True)
         logging.info("Dragon opportunity scan cycle configured at %.1fs dynamic_profit=%s floor=%s no_ceiling=true", poll, dynamic_profit, min_profit_floor)
-        triangular_enabled = env_bool("TRIANGULAR_ARBITRAGE_ENABLED", True)
+        # Hard policy: direct two-leg Base opportunities only. Config cannot re-enable cycles.\n        triangular_enabled = False
         capacity = ExecutionCapacity(initial=int(os.getenv("DEX_MAX_EXECUTION_CONCURRENCY", "8")), maximum=None)
         sponsor_manager = GasSponsorManager(min_net_profit=min_profit)
         economic_agent = EconomicDecisionAgent(history_size=int(os.getenv("ECONOMIC_AGENT_HISTORY_SIZE", "256")), min_profit=min_profit)
