@@ -49,3 +49,18 @@ def test_venue_scanners_are_isolated():
  results=VenueScannerRegistry([good,bad]).scan_all()
  assert results[0].ok and results[0].value=="quote"
  assert not results[1].ok and "rpc down" in results[1].error
+
+def test_quote_adapters_are_isolated():
+ from dragon.adapters.aerodrome import AerodromeAdapter
+ from dragon.adapters.uniswap_v3 import UniswapV3Adapter
+ from dragon.adapters.sushiswap import SushiSwapAdapter
+ from dragon.adapters.registry import IsolatedAdapterRegistry
+ good=AerodromeAdapter(lambda _: "aero")
+ bad=UniswapV3Adapter(lambda _: (_ for _ in ()).throw(RuntimeError("uniswap rpc down")))
+ sushi=SushiSwapAdapter(lambda _: "sushi")
+ results=IsolatedAdapterRegistry([good,bad,sushi]).quote_all({})
+ assert [(r.venue,r.ok,r.quote) for r in results]==[
+  ("aerodrome",True,"aero"),
+  ("uniswap_v3",False,None),
+  ("sushiswap",True,"sushi"),
+ ]
