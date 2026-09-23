@@ -62,6 +62,14 @@ services:
         value: "50"
       - key: DEX_POLL_SECONDS
         value: "1"
+      - key: DEX_QUOTE_CACHE_SECONDS
+        value: "0"
+      - key: DEX_HARD_QUOTE_DEADLINE_MS
+        value: "500"
+      - key: DEX_RPC_TIMEOUT_SECONDS
+        value: "0.4"
+      - key: DEX_RPC_PROVIDER_MAX_INFLIGHT
+        value: "2"
       - key: DRAGON_BASE_VENUES
         value: "Aerodrome,Uniswap_V3"
       - key: DEX_UNIVERSE_REFRESH_SECONDS
