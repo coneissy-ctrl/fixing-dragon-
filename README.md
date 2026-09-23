@@ -35,3 +35,16 @@ input → leg 1 live quote → leg 2 live quote → swap costs → gas → flash
 
 ## Execution boundary
 The scanner remains read-only. Atomic execution/signing is outside this workspace boundary until the live quote path and execution hand-off are independently verified.
+
+## Isolated analysis scanners
+The control plane also uses independent scanners for separate concerns:
+- Liquidity: executable liquidity check.
+- Price impact: size-dependent price-impact check.
+- Gas: current execution-cost input validation.
+- Staleness: quote freshness check.
+- Execution: route/execution readiness check.
+- Profit: hard net-profit floor check.
+- Simulation: full two-leg simulation gate.
+- Sizing: executable amount validation.
+
+Each scanner has its own failure boundary. A failed analysis scanner returns a failed result rather than terminating the other scanners. These scanners do not bypass the Base-only perimeter, the isolated venue adapters, the direct two-leg route restriction, or the external execution boundary.
