@@ -91,3 +91,15 @@ def test_profit_scanner_enforces_floor():
  assert profit_scan(c)==Decimal("0.006")
  c2=ScannerContext(True,True,Decimal("0.01"),0,1,True,Decimal("0.004"),Decimal("0.005"),True,1)
  with pytest.raises(ValueError): profit_scan(c2)
+
+
+def test_rpc_failover_state_is_isolated():
+ from dragon.rpc import IsolatedRpcFailover, IsolatedRpcRegistry
+ aero=IsolatedRpcFailover("aerodrome",("a1","a2"))
+ uni=IsolatedRpcFailover("uniswap_v3",("u1","u2"))
+ registry=IsolatedRpcRegistry([aero,uni])
+ aero.pool.mark_failure(aero.pool.endpoints[0])
+ assert aero.pool.endpoints[0].failures==1
+ assert uni.pool.endpoints[0].failures==0
+ assert registry.by_name("aerodrome") is aero
+ assert registry.by_name("uniswap_v3") is uni
