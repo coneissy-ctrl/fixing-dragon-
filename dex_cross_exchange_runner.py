@@ -38,6 +38,7 @@ from src.dragon.five_circle_engine import FiveCircleEngine
 from src.dragon.base_proof_engine import BaseProofEngine
 from src.dragon.base_atomic_simulator import BaseAtomicSimulator
 from src.dragon.base_pool_discovery import discover_recent_base_tokens
+from src.dragon.base_opportunity_universe import BASE_UNIVERSE
 
 STATE = {
     "status": "starting", "mode": "paper", "chains": [], "chain_details": {},
@@ -68,7 +69,7 @@ STATE = {
     "aave_agent": {"workflow": AAVE_AGENT_WORKFLOW, "sources": AAVE_AGENT_SOURCES, "policy": "discover-inspect-simulate-build-wallet-sign-confirm"},
     "aerodrome": {"enabled": True, "mode": "read_only", "deployment_allowed": False, "opportunities": [], "last_update": None, "error": None},
     "aave_address_book": aave_address_snapshot(),
-    "data_source": "multi-chain multi-scanner executable quotes + triangular/cross-DEX + Aave MCP read-only market data",
+    "data_source": "Base 8453 live expanding two-leg scanner: Aerodrome <-> Uniswap V3 + read-only Aave data",
     "triangular_enabled": False, "triangular_opportunities": 0,
     "execution_capacity": 8, "gas_sponsor_enabled": False, "gas_sponsor_required": False,
     "economic_agent": {"enabled": True, "last_update": None, "ranked_orders": [], "chain_memory": {}},
@@ -806,6 +807,8 @@ async def scan_evm_chain(adapter, chain_id, *, max_quote, taker, slippage, min_p
     spec = get_spec(chain_id)
     quote_token, quote_decimals = _quote_token_for(chain_id)
     base_tokens = _base_tokens_for(chain_id)
+    if int(chain_id) == 8453:
+        base_tokens = BASE_UNIVERSE.tokens(adapter, quote_token, base_tokens)
     venue_names = configured_base_venues(chain_id)
     flash_enabled = env_bool("FLASH_LOAN_ENABLED", True)
     configured_fee_bps = env_decimal("FLASH_LOAN_FEE_BPS", "0")
