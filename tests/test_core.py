@@ -41,3 +41,11 @@ def test_rpc_failover():
   return {"ok":True}
  assert asyncio.run(pool.call(transport,{"method":"eth_blockNumber"}))=={"ok":True}
  assert pool.endpoints[0].failures==1
+
+def test_venue_scanners_are_isolated():
+ from dragon.venues import IsolatedVenueScanner, VenueScannerRegistry
+ good=IsolatedVenueScanner("aerodrome",lambda: "quote")
+ bad=IsolatedVenueScanner("sushiswap",lambda: (_ for _ in ()).throw(RuntimeError("rpc down")))
+ results=VenueScannerRegistry([good,bad]).scan_all()
+ assert results[0].ok and results[0].value=="quote"
+ assert not results[1].ok and "rpc down" in results[1].error
