@@ -1,1 +1,3 @@
-__version__ = "0.1.0"
+"""Dragon: Base-only two-leg DEX arbitrage core."""
+CHAIN_ID = 8453
+VENUES = ("aerodrome", "uniswap_v3")
