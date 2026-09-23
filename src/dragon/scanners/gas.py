@@ -33,7 +33,7 @@ class IsolatedGasScanner:
         self._estimate_fn = estimate_fn
         self._gas_price_fn = gas_price_fn
         self._native_price_fn = native_price_fn
-        self.gas_ceiling_usd = Decimal(gas_ceiling_usd)
+        self.gas_ceiling_usd = None if gas_ceiling_usd is None else Decimal(gas_ceiling_usd)\n        self.max_gas_share = Decimal(max_gas_share)
 
     def scan(self, context: Any, gross_net_profit_usd: Decimal) -> GasSnapshot:
         gas_price = int(self._gas_price_fn(context))
