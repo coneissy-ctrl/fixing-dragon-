@@ -1,0 +1,50 @@
+mode: paper
+
+strategy:
+  type: cross_dex
+  triangular: false
+  intra_exchange: false
+
+market:
+  type: dex_spot
+  spot: true
+  futures: false
+  perpetuals: false
+  leverage: 1
+
+capital:
+  starting_balance_usdt: 0
+  own_capital_usdt: 0
+  flash_loan_only: true
+
+arbitrage:
+  min_net_profit_usdt: 0.003
+  include_trading_fees: true
+  include_gas_cost: true
+  include_slippage: true
+  include_mev_reserve: true
+  max_quote_age_ms: 1000
+  max_pair_skew_ms: 1000
+  quote_deadline_ms: 1000
+
+position:
+  sizing: flash_liquidity_dynamic
+  dynamic_sizing: true
+  min_flash_loan_quote: 100
+  max_flash_loan_quote: 3000
+  compound_realized_pnl: true
+
+execution:
+  continuous_scanning: true
+  continuous_trading: false
+  order_type: market
+  leg_timeout_ms: 1500
+  hedge_on_partial_fill: false
+  live_execution: false
+  mev_protection_required: true
+  atomic_repayment_required: true
+
+runtime:
+  poll_interval_ms: 500
+  max_concurrent_pairs: 64
+  log_level: INFO

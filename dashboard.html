@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dragon | DEX Command Center</title>
+<style>
+:root{--bg:#070c14;--panel:#0d1623;--panel2:#101d2d;--line:#20344b;--text:#edf5ff;--muted:#8da3bb;--cyan:#56d8e8;--green:#69e0a1;--amber:#ffca70;--red:#ff7785;--blue:#91adff;--shadow:0 18px 50px #0008}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 90% -5%,#173c56 0,transparent 34%),var(--bg);color:var(--text);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}.app{max-width:1500px;margin:auto;padding:22px 20px 50px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}.brand{display:flex;gap:12px;align-items:center}.mark{width:38px;height:38px;border:1px solid #2d7180;border-radius:12px;display:grid;place-items:center;color:var(--cyan);font-weight:900;font-size:17px;background:#0c2633}.eyebrow{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--cyan);font-weight:800}.title{font-size:25px;font-weight:850;letter-spacing:-.03em}.sub{color:var(--muted);font-size:12px}.toolbar{display:flex;align-items:center;gap:8px}.pill,.button{border:1px solid var(--line);background:#0b1420;color:var(--text);border-radius:999px;padding:8px 12px;font-size:12px}.pill{font-weight:800;letter-spacing:.06em}.button{cursor:pointer}.button:hover{border-color:var(--cyan);color:var(--cyan)}.live{color:var(--green);border-color:#2c7656;background:#0d2b22}.safe{color:var(--amber);border-color:#765b27;background:#2a2110}.down{color:var(--red);border-color:#74333c;background:#2c151b}.hero{margin-top:22px;padding:25px;border:1px solid #28445e;border-radius:20px;background:linear-gradient(135deg,#102236 0,#0c1522 60%,#0b1019 100%);box-shadow:var(--shadow);display:flex;justify-content:space-between;gap:25px;align-items:flex-end}.hero h1{font-size:clamp(30px,4vw,54px);line-height:1.02;letter-spacing:-.06em;margin:8px 0 12px}.hero p{margin:0;color:#b6c8dc;max-width:690px}.hero-right{text-align:right;min-width:180px}.hero-right .big{font-size:28px;font-weight:850}.muted{color:var(--muted)}.grid{display:grid;gap:12px}.kpis{grid-template-columns:repeat(8,1fr);margin-top:14px}.card{background:linear-gradient(145deg,rgba(13,22,35,.97),rgba(10,18,29,.97));border:1px solid var(--line);border-radius:15px;padding:15px;min-width:0}.label{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.1em;font-weight:700}.value{font-size:23px;font-weight:850;letter-spacing:-.04em;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.small{font-size:12px;color:var(--muted)}.cyan{color:var(--cyan)}.green{color:var(--green)}.amber{color:var(--amber)}.red{color:var(--red)}.blue{color:var(--blue)}.layout{grid-template-columns:1.35fr .65fr;margin-top:14px}.wide{margin-top:14px}.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.section-title h2{font-size:16px;margin:0;letter-spacing:-.02em}.section-title span{font-size:11px;color:var(--muted)}.chart{height:210px;width:100%;display:block}.funnel{display:grid;gap:8px}.funnel-row{display:grid;grid-template-columns:175px 1fr 70px;align-items:center;gap:10px;font-size:12px}.bar{height:8px;border-radius:99px;background:#152638;overflow:hidden}.bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--cyan),var(--blue));min-width:2px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:760px;font-size:12px}th,td{text-align:left;padding:10px 9px;border-bottom:1px solid #1b2b3e;vertical-align:top}th{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}tr:last-child td{border-bottom:0}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}.tag{display:inline-block;padding:3px 6px;border-radius:5px;background:#132538;border:1px solid #25425b;color:#c4d9ef}.empty{padding:24px;text-align:center;color:var(--muted)}.rejections{display:grid;gap:8px}.reject{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #1b2b3e;font-size:12px}.reject:last-child{border:0}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:6px}.dot.red-dot{background:var(--red)}.config{display:grid;grid-template-columns:1fr 1fr;gap:8px}.config div{padding:10px;background:#0a1420;border:1px solid #1a2c40;border-radius:9px;min-width:0}.config b{display:block;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.footer{margin-top:18px;display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:11px;flex-wrap:wrap}@media(max-width:1200px){.kpis{grid-template-columns:repeat(4,1fr)}}@media(max-width:850px){.layout{grid-template-columns:1fr}.hero{align-items:flex-start;flex-direction:column}.hero-right{text-align:left}.kpis{grid-template-columns:repeat(2,1fr)}.funnel-row{grid-template-columns:130px 1fr 52px}}@media(max-width:480px){.app{padding:15px 11px 35px}.title{font-size:20px}.toolbar{width:100%}.toolbar .button{flex:1}.kpis{gap:8px}.card{padding:12px}.value{font-size:20px}.funnel-row{grid-template-columns:105px 1fr 45px;font-size:11px}.config{grid-template-columns:1fr}.hero{padding:19px}}
+</style>
+
+<script src="https://cdn.amplitude.com/script/ff01e1ea98c4ada7f1273581870ab80e.js"></script>
+<script>
+window.amplitude.init("ff01e1ea98c4ada7f1273581870ab80e", {
+  defaultTracking: true,
+  autocapture: true,
+  fetchRemoteConfig: true
+});
+window.amplitude.add(window.sessionReplay.plugin({ sampleRate: 1 }));
+
+// Optimizely -> Amplitude Browser SDK 2.x integration.
+// Safe no-op unless the dashboard is running inside an Optimizely extension
+// context that provides window.optimizely, campaignId, and extension settings.
+(function initOptimizelyAmplitudeIntegration() {
+  var dataSent = false;
+  var MAX_ATTEMPTS = 9;
+  var RETRY_DELAY_MS = 1000;
+  var fallbackConfig = {
+    property_prefix: "[Optimizely Experiment]",
+    send_event: "n",
+    event_name: "User in Experiment"
+  };
+
+  function configValue(name) {
+    try {
+      if (window.extension && window.extension[name] !== undefined) {
+        return window.extension[name];
+      }
+    } catch (_) {}
+    return fallbackConfig[name];
+  }
+
+  function getCampaignId() {
+    try {
+      if (typeof campaignId !== "undefined" && campaignId !== null) return campaignId;
+    } catch (_) {}
+    try {
+      if (window.campaignId !== undefined && window.campaignId !== null) return window.campaignId;
+    } catch (_) {}
+    return null;
+  }
+
+  function getCampaignInfo() {
+    var id = getCampaignId();
+    if (!id || !window.optimizely || typeof window.optimizely.get !== "function") return null;
+    try {
+      var state = window.optimizely.get("state");
+      if (!state || typeof state.getDecisionObject !== "function") return null;
+      return state.getDecisionObject({ campaignId: id });
+    } catch (error) {
+      if (window.console && console.debug) console.debug("Optimizely decision lookup unavailable", error);
+      return null;
+    }
+  }
+
+  function sendData() {
+    if (dataSent || !window.amplitude) return false;
+
+    var sent = false;
+
+    // Mobile SDK parity: emit the experiment/variation map as a single event
+    // using the same property names supplied by the Android/iOS examples.
+    if (typeof window.amplitude.track === "function") {
+      logExperimentsAndVariations();
+      sent = true;
+    }
+
+    var campaignInfo = getCampaignInfo();
+    if (campaignInfo && campaignInfo.experiment && campaignInfo.variation &&
+        typeof window.amplitude.identify === "function" &&
+        typeof window.amplitude.Identify === "function") {
+      var prefix = String(configValue("property_prefix") || fallbackConfig.property_prefix);
+      var identify = new window.amplitude.Identify().set(
+        prefix + " " + campaignInfo.experiment,
+        campaignInfo.variation
+      );
+      window.amplitude.identify(identify);
+      sent = true;
+
+      if (String(configValue("send_event")) === "y") {
+        var eventName = String(configValue("event_name") || fallbackConfig.event_name);
+        window.amplitude.track(eventName, {
+          "[Optimizely Campaign]": campaignInfo.campaign,
+          "[Optimizely Experiment]": campaignInfo.experiment,
+          "[Optimizely Variation]": campaignInfo.variation,
+          "[Optimizely Holdback]": campaignInfo.holdback,
+          "customProperty1": "value1",
+          "customProperty2": "value2",
+          "customProperty3": "value3"
+        });
+      }
+    }
+
+    dataSent = sent;
+    return sent;
+  }
+
+  function sendToAmplitude(attempt) {
+    if (dataSent || attempt >= MAX_ATTEMPTS) return;
+    if (window.amplitude && typeof window.amplitude.track === "function" && typeof window.amplitude.identify === "function") {
+      if (sendData()) return;
+    }
+    window.setTimeout(function () { sendToAmplitude(attempt + 1); }, RETRY_DELAY_MS);
+  }
+
+  function logExperimentsAndVariations() {
+    if (!window.amplitude || typeof window.amplitude.track !== "function") return false;
+
+    window.amplitude.track("TL_Experiments", {
+      "Experiment 1": "Variation 1",
+      "Experiment 2": "baseline"
+    });
+    return true;
+  }
+
+  // Expose a small test hook without requiring Optimizely in production.
+  window.dragonOptimizelyAmplitude = {
+    send: function () { return sendData(); },
+    reset: function () { dataSent = false; }
+  };
+
+  sendToAmplitude(0);
+})();
+</script>
+</head>
+<body>
+<main class="app">
+<header class="topbar">
+  <div class="brand"><div class="mark">D</div><div><div class="eyebrow">Base DEX execution</div><div class="title">Dragon Command Center</div><div class="sub">Live opportunity telemetry, flash-loan sizing and realized outcomes</div></div></div>
+  <div class="toolbar"><div id="mode" class="pill safe">CONNECTING</div><button id="pause" class="button">Pause updates</button><button id="refresh" class="button">Refresh</button></div>
+</header>
+
+<section class="hero"><div><div class="eyebrow">System posture</div><h1 id="headline">Waiting for the runner</h1><p id="summary">The dashboard will poll the runner's no-store health endpoint every second. Estimated opportunities are kept separate from realized P&amp;L.</p></div><div class="hero-right"><div class="label">Last update</div><div id="updated" class="big">--</div><div id="connection" class="small"><span class="dot"></span>Connecting</div></div></section>
+
+<section id="kpis" class="grid kpis"></section>
+
+<div class="grid layout">
+  <section class="card"><div class="section-title"><h2>Activity pulse</h2><span id="pulseLabel">Waiting for data</span></div><canvas id="chart" class="chart"></canvas><div class="small">Blue: opportunities per scan. Green: included transactions. Amber: cumulative realized P&amp;L.</div></section>
+  <section class="card"><div class="section-title"><h2>Runtime configuration</h2><span>read-only</span></div><div id="config" class="config"></div></section>
+</div>
+
+<section class="card wide"><div class="section-title"><h2>Execution funnel</h2><span>where opportunities disappear</span></div><div id="funnel" class="funnel"></div></section>
+
+<section class="card wide"><div class="section-title"><h2>Current opportunities</h2><span id="opportunityCount">0 records</span></div><div id="opportunities" class="table-wrap"></div></section>
+
+<div class="grid layout">
+  <section class="card"><div class="section-title"><h2>Recent lifecycle records</h2><span>bounded history</span></div><div id="records" class="table-wrap"></div></section>
+  <section class="card"><div class="section-title"><h2>Rejection reasons</h2><span>latest scan</span></div><div id="rejections" class="rejections"></div></section>
+</div>
+
+<section class="card wide"><div class="section-title"><h2>Operating notes</h2><span>automatic safety context</span></div><div id="notes" class="small"></div></section>
+<footer class="footer"><span>Dragon dashboard v2 | refresh interval <b id="interval">1s</b></span><span id="endpoint">Endpoint: /health</span></footer>
+</main>
+<script>
+const $=id=>document.getElementById(id), history=[], MAX_HISTORY=90; let paused=false, lastPayload=null;
+const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const num=(v,d=3)=>{if(v===null||v===undefined||v==='')return '--';const n=Number(v);return Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:d}):'--'};
+const age=ts=>ts?Math.max(0,Date.now()/1000-Number(ts)):null;
+const first=(...v)=>v.find(x=>x!==undefined&&x!==null);
+function money(v){return v===null||v===undefined||v===''?'--':num(v,6)}
+function renderKpis(s,c){const live=s.mode==='live'||(s.live&&!s.dry_run);const rows=[['MODE',live?'LIVE':'PAPER',live?'green':'amber'],['FLASH CAP',first(s.flash_cap,'--'), 'blue'],['AAVE LIQUIDITY',first(s.flash_pool_liquidity,'--'),'cyan'],['COMPOUND RESERVE',first(s.compound_reserve_quote,'0'),'green'],['FLASH AMOUNT',first(s.flash_loan_amount_quote,'--'),'blue'],['OPPORTUNITIES',first(s.opportunities,c.opportunities_detected,0),'amber'],['TX INCLUDED',first(c.tx_included,0),'green'],['REALIZED P&L',money(first(c.realized_profit,0)),Number(c.realized_profit||0)>=0?'green':'red']];$('kpis').innerHTML=rows.map(r=>`<div class="card"><div class="label">${r[0]}</div><div class="value ${r[2]}">${esc(r[1])}</div>${r[0]==='MODE'?'<div class="small">'+(s.status||'unknown')+'</div>':''}</div>`).join('');}
+function renderFunnel(c){const rows=[['Quote observations',c.quote_observations],['Opportunities detected',c.opportunities_detected],['After fees',c.opportunities_after_fees],['After gas',c.opportunities_after_gas],['After slippage',c.opportunities_after_slippage],['After MEV buffer',c.opportunities_after_mev_buffer],['Optimal size found',c.optimal_size_found],['Simulation passed',c.fresh_simulation_passed],['Submitted',c.tx_submitted],['Included',c.tx_included],['Reverted',c.tx_reverted]];const max=Math.max(1,...rows.map(r=>Number(r[1]||0)));$('funnel').innerHTML=rows.map(r=>`<div class="funnel-row"><span>${r[0]}</span><span class="bar"><i style="width:${Math.min(100,Number(r[1]||0)/max*100)}%"></i></span><b>${num(r[1],0)}</b></div>`).join('');}
+ function renderConfig(s){const details=s.chain_details||{};const chains=Object.keys(details);const totalVenues=chains.reduce((n,k)=>n+((details[k].venues||[]).length),0);const universe=s.universe||[];const active=universe.filter(x=>x.scan_ready).length;const rows=[['Chains',s.chains&&s.chains.length?s.chains.join(', '):'--'],['Venues',num(totalVenues,0)],['Universe',`${num(universe.length,0)} assets`],['Active / watchlist',`${active} / ${Math.max(0,universe.length-active)}`],[],['Quote decimals',s.quote_decimals||'--'],['Min net profit',s.min_net_profit||'--'],['Safety buffer',s.safety_buffer||'--'],['Compounding',s.compounding_enabled?'ON':'inactive'],['Data source','Executable quotes + universe watchlist']];const chainRows=chains.map(k=>{const d=details[k]||{};return `<div><span class="label">${esc(k)}</span><b>${esc((d.venues||[]).join(', ')||'--')}</b></div>`});$('config').innerHTML=rows.map(r=>r.length?`<div><span class="label">${r[0]}</span><b>${esc(r[1])}</b></div>`:'<div style="height:6px"></div>').join('')+chainRows.join('');}
+function renderOpps(records){$('opportunityCount').textContent=`${records.length} records`;if(!records.length){$('opportunities').innerHTML='<div class="empty">No opportunity currently passes the displayed gates.</div>';return}$('opportunities').innerHTML=`<table><tr><th>Token</th><th>Route</th><th>Total</th><th>Flash</th><th>Multiplier</th><th>Compound</th><th>Gross</th><th>Net</th><th>Stage</th><th>Age</th></tr>${records.slice(0,20).map(x=>`<tr><td class="mono">${esc(x.base_token)}</td><td><span class="tag">${esc(x.buy_source)}</span> -> <span class="tag">${esc(x.sell_source)}</span></td><td>${esc(x.quote_amount||'--')}</td><td>${esc(x.flash_loan_amount||'--')}</td><td class="blue"><b>${esc(x.flash_multiplier?x.flash_multiplier+'x':'--')}</b></td><td>${esc(x.compound_amount||'0')}</td><td>${esc(x.gross_profit_quote||'--')}</td><td class="green"><b>${esc(x.net_profit_quote||'--')}</b></td><td>${esc(x.stage||'--')}</td><td>${age(x.detected_at)===null?'--':num(age(x.detected_at),1)+'s'}</td></tr>`).join('')}</table>`;}
+function renderRecords(records){if(!records.length){$('records').innerHTML='<div class="empty">No lifecycle records yet.</div>';return}$('records').innerHTML=`<table><tr><th>Stage</th><th>Realized</th><th>TX</th><th>Updated</th></tr>${records.slice(0,12).map(x=>`<tr><td><b>${esc(x.stage||'--')}</b><br><span class="mono">${esc(x.id)}</span></td><td class="${x.realized_pnl_quote>=0?'green':''}">${esc(x.realized_pnl_quote??'--')}</td><td class="mono">${esc(x.tx_hash||'--')}</td><td>${age(x.updated_at)===null?'--':num(age(x.updated_at),1)+'s ago'}</td></tr>`).join('')}</table>`;}
+function renderRejections(r){const rows=Object.entries(r||{}).sort((a,b)=>Number(b[1])-Number(a[1]));$('rejections').innerHTML=rows.length?rows.slice(0,14).map(x=>`<div class="reject"><span><span class="dot red-dot"></span>${esc(x[0])}</span><b>${num(x[1],0)}</b></div>`).join(''):'<div class="empty">No rejection reasons reported.</div>';}
+function drawChart(){const canvas=$('chart'),box=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1,w=Math.max(300,box.width),h=210;canvas.width=w*dpr;canvas.height=h*dpr;const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);ctx.strokeStyle='#1b3045';ctx.lineWidth=1;for(let i=1;i<5;i++){const y=i*h/5;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}if(history.length<2)return;const max=Math.max(1,...history.flatMap(x=>[x.opp,x.included]));const path=(key,color)=>{ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();history.forEach((x,i)=>{const px=i/(MAX_HISTORY-1)*w,py=h-14-(Number(x[key]||0)/max)*(h-30);i?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.stroke()};path('opp','#56d8e8');path('included','#69e0a1');}
+function render(data){lastPayload=data;const s=data.state||data||{},obs=data.observability||{},c=obs.counters||{},records=obs.recent_records&&obs.recent_records.length?obs.recent_records:(s.opportunity_records||[]),live=s.mode==='live'||(s.live&&!s.dry_run);$('mode').className=`pill ${live?'live':'safe'}`;$('mode').textContent=live?'LIVE':'PAPER / SAFE';$('headline').textContent=live?'Execution is live':'Observation mode is active';$('summary').textContent=s.last_error?`Runner warning: ${s.last_error}`:`${s.status||'unknown'} | ${s.data_source||'health telemetry connected'}`;$('updated').textContent=new Date().toLocaleTimeString();$('connection').innerHTML='<span class="dot"></span>Health data connected';renderKpis(s,c);renderConfig(s);renderFunnel(c);renderOpps(records);renderRecords(records);renderRejections(data.rejections||s.rejections);$('notes').innerHTML=`Flash cap is ${esc(s.flash_cap||'--')} quote units. Compound reserve is capped separately at ${esc(s.compound_max_quote||'--')}. Exact on-chain profit is counted only after receipt and event parsing. ${live?'Live mode requires the redeployed hybrid executor and private MEV RPC.':'Live execution is disabled; no transaction can be submitted from this dashboard.'}`;history.push({opp:Number(s.opportunities||c.opportunities_detected||0),included:Number(c.tx_included||0)});if(history.length>MAX_HISTORY)history.shift();$('pulseLabel').textContent=`${history.length} samples`;drawChart();}
+async function load(){if(paused)return;try{const r=await fetch('/health?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error(`HTTP ${r.status}`);render(await r.json());}catch(e){$('mode').className='pill down';$('mode').textContent='OFFLINE';$('headline').textContent='Health endpoint unavailable';$('connection').innerHTML='<span class="dot red-dot"></span>'+esc(e.message);}}
+$('pause').onclick=()=>{paused=!paused;$('pause').textContent=paused?'Resume updates':'Pause updates';};$('refresh').onclick=load;window.addEventListener('resize',drawChart);load();setInterval(load,1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+name: Verify dashboard root route
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "dex_cross_exchange_runner.py"
+      - ".github/workflows/fix-dashboard-root.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify root redirect implementation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s = Path('dex_cross_exchange_runner.py').read_text(encoding='utf-8')
+          required = [
+              'if path == "/":',
+              'self.send_response(302)',
+              'self.send_header("Location", "/dashboard")',
+          ]
+          missing = [x for x in required if x not in s]
+          if missing:
+              raise SystemExit(f'dashboard root redirect missing: {missing}')
+          print('dashboard root redirect verified')
+          PY
