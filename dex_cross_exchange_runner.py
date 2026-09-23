@@ -421,8 +421,8 @@ def _enabled_evm_chains() -> list[int]:
 
 
 def _enabled_nonevm() -> list[str]:
-    raw = os.getenv("NONEVM_CHAINS", "").strip()
-    return [x.strip().lower() for x in raw.split(",") if x.strip()]
+    """Non-EVM opportunity scanning is disabled by the Base hard lock."""
+    return []
 
 
 def _validate_quote_token_config(chain_id: int) -> tuple[str, int]:
