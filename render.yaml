@@ -66,6 +66,14 @@ services:
         value: "0"
       - key: DEX_HARD_QUOTE_DEADLINE_MS
         value: "500"
+      - key: DEX_MAX_QUOTE_AGE_MS
+        value: "500"
+      - key: DEX_QUOTE_CONCURRENCY
+        value: "2"
+      - key: DEX_SELL_CONCURRENCY
+        value: "2"
+      - key: DEX_CANDIDATE_CONCURRENCY
+        value: "2"
       - key: DEX_RPC_TIMEOUT_SECONDS
         value: "0.4"
       - key: DEX_RPC_PROVIDER_MAX_INFLIGHT
