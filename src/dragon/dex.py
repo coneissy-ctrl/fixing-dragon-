@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from decimal import Decimal
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -21,6 +22,9 @@ class DexQuote:
     fee_bps: Decimal
     slippage_bps: Decimal
     latency_ms: Decimal = Decimal("0")
+    # Local monotonic observation time makes quote freshness enforceable even when
+    # an upstream provider does not return a server timestamp.
+    observed_at_monotonic: float = field(default_factory=time.monotonic, compare=False)
 
     @property
     def gross_bps(self) -> Decimal:
