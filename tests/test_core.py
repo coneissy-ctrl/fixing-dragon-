@@ -103,3 +103,30 @@ def test_rpc_failover_state_is_isolated():
  assert uni.pool.endpoints[0].failures==0
  assert registry.by_name("aerodrome") is aero
  assert registry.by_name("uniswap_v3") is uni
+
+
+def test_each_venue_has_isolated_gas_scanner():
+ from dragon.scanners.gas import make_isolated_gas_scanners
+ venues=("aerodrome","uniswap_v3","sushiswap")
+ estimates={v:(lambda _: 100000) for v in venues}
+ prices={v:(lambda _: 100000000) for v in venues}
+ native={v:(lambda _: Decimal("2500")) for v in venues}
+ scanners=make_isolated_gas_scanners(estimates,prices,native,Decimal("0.05"))
+ assert set(scanners)==set(venues)
+ snapshots={
+  v: scanners[v].scan({"execution_overhead_gas":10000},Decimal("0.10"))
+  for v in venues
+ }
+ assert all(s.gas_estimate==100000 for s in snapshots.values())
+ assert all(s.gas_cost_usd==Decimal("0.0275") for s in snapshots.values())
+ assert all(scanners[v].passes(snapshots[v],Decimal("0.005")) for v in venues)
+
+
+def test_gas_ceiling_isolated():
+ from dragon.scanners.gas import IsolatedGasScanner
+ aero=IsolatedGasScanner("aerodrome",lambda _: 100000,lambda _: 100000000,lambda _: Decimal("2500"),Decimal("0.01"))
+ uni=IsolatedGasScanner("uniswap_v3",lambda _: 100000,lambda _: 100000000,lambda _: Decimal("2500"),Decimal("0.10"))
+ a=aero.scan({"execution_overhead_gas":10000},Decimal("0.10"))
+ u=uni.scan({"execution_overhead_gas":10000},Decimal("0.10"))
+ assert not aero.passes(a,Decimal("0.005"))
+ assert uni.passes(u,Decimal("0.005"))
