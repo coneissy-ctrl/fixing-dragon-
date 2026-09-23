@@ -24,3 +24,25 @@ def test_universe_merges_configured_and_curated(monkeypatch):
     assert tokens
     assert quote.lower() not in {x.lower() for x in tokens}
     assert configured[0].lower() in {x.lower() for x in tokens}
+
+
+def test_base_engine_rejects_non_perimeter_route():
+    from src.dragon.dex_cross_exchange import DexCrossExchangeEngine
+    import pytest
+
+    with pytest.raises(ValueError, match="hard-locked"):
+        DexCrossExchangeEngine(None, ["Aerodrome", "SushiSwap"], min_profit="0.005").scan_once(
+            chain_id=8453,
+            quote_token="0x0000000000000000000000000000000000000001",
+            base_token="0x0000000000000000000000000000000000000002",
+            quote_amount=1,
+            taker="0x0000000000000000000000000000000000000003",
+        )
+
+
+def test_base_engine_requires_minimum_profit():
+    from src.dragon.dex_cross_exchange import DexCrossExchangeEngine
+    import pytest
+
+    with pytest.raises(ValueError, match="0.005"):
+        DexCrossExchangeEngine(None, ["Aerodrome", "Uniswap_V3"], min_profit="0.0049")
