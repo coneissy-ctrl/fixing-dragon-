@@ -37,6 +37,7 @@ from src.dragon.base_live import BaseLiveReader
 from src.dragon.five_circle_engine import FiveCircleEngine
 from src.dragon.base_proof_engine import BaseProofEngine
 from src.dragon.base_atomic_simulator import BaseAtomicSimulator
+from src.dragon.base_pool_discovery import discover_recent_base_tokens
 
 STATE = {
     "status": "starting", "mode": "paper", "chains": [], "chain_details": {},
@@ -321,26 +322,13 @@ def env_bool(name, default=False):
 
 
 def configured_base_venues(chain_id: int) -> list[str]:
-    """Return the exact DEX allowlist for the cross-DEX scanner."""
-    configured = [
-        x.strip()
-        for x in os.getenv("DRAGON_BASE_VENUES", "Aerodrome,Uniswap_V3").split(",")
-        if x.strip()
-    ]
-    available = {v.name for v in venues_for(chain_id)}
-    selected = [name for name in configured if name in available]
-    unknown = [name for name in configured if name not in available]
-    if unknown:
-        logging.warning(
-            "Ignoring unknown/unavailable Base DEX venues chain=%s venues=%s",
-            chain_id,
-            unknown,
-        )
-    if len(selected) < 2:
-        raise ValueError(
-            f"DRAGON_BASE_VENUES must resolve to at least two available venues on chain {chain_id}; "
-            f"configured={configured} available={sorted(available)}"
-        )
+    """Hard-lock the opportunity engine to Base + Aerodrome + Uniswap V3."""
+    if int(chain_id) != 8453:
+        raise ValueError("Dragon opportunity engine is hard-locked to Base chain 8453")
+    selected = ["Aerodrome", "Uniswap_V3"]
+    available = {v.name for v in venues_for(8453)}
+    if not set(selected).issubset(available):
+        raise ValueError("Base Aerodrome + Uniswap_V3 venue perimeter is incomplete")
     return selected
 
 
@@ -427,19 +415,8 @@ NONEVM_PROBES: dict[str, tuple[str, str, str]] = {
 
 
 def _enabled_evm_chains() -> list[int]:
-    raw = os.getenv("DEX_CHAINS", "1,56,43114,8453,42161,10,137,130,324,7777777,480,42220,59144,534352,81457,5000").strip()
-    ids: list[int] = []
-    for part in raw.split(","):
-        part = part.strip()
-        if not part:
-            continue
-        try:
-            cid = int(part)
-        except ValueError:
-            continue
-        if get_spec(cid) is not None and cid not in ids:
-            ids.append(cid)
-    return ids or [8453]
+    """Hard-lock executable opportunity scanning to Base mainnet."""
+    return [8453]
 
 
 def _enabled_nonevm() -> list[str]:
@@ -481,6 +458,8 @@ def _base_tokens_for(chain_id: int) -> list[str]:
 
 
 def _triangular_tokens_for(chain_id: int) -> tuple[str, str, str] | None:
+    """Triangular routing is permanently disabled in the opportunity engine."""
+    return None
     """Return an operator-verified three-token cycle for a chain."""
     raw = os.getenv("DEX_TRIANGULAR_TOKENS", "").strip()
     if not raw: return None
@@ -1190,7 +1169,7 @@ async def main():
                     for k, v in rej.items():
                         rejections[k] = rejections.get(k, 0) + int(v)
                 triangular_results = []
-                if triangular_enabled:
+                if False:
                     triangular_results = await asyncio.gather(
                         *(scan_triangular_chain(adapter, cid,
                           max_quote=quote_units(flash_cap_quote, _quote_token_for(cid)[1]),
