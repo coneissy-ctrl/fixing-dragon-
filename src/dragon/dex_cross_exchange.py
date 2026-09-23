@@ -40,9 +40,9 @@ class DexOpportunity:
 class DexCrossExchangeEngine:
     """Two-leg cross-DEX scanner with conservative net-profit accounting."""
 
-    def __init__(self, adapter, sources: Iterable[str], min_profit: Decimal = Decimal("0.002"), quote_token_decimals: int = 6, max_quote_latency_ms: Decimal = Decimal(os.getenv("DEX_MAX_QUOTE_LATENCY_MS", "500")), safety_buffer_quote: Decimal = Decimal("0"), flash_loan_enabled: bool = False, flash_loan_fee_bps: Decimal = Decimal("0"), native_to_quote_rate: Decimal = Decimal("0"), min_net_bps: Decimal = Decimal("15"), telemetry=None):
+    def __init__(self, adapter, sources: Iterable[str], min_profit: Decimal = Decimal("0.005"), quote_token_decimals: int = 6, max_quote_latency_ms: Decimal = Decimal(os.getenv("DEX_MAX_QUOTE_LATENCY_MS", "500")), safety_buffer_quote: Decimal = Decimal("0"), flash_loan_enabled: bool = False, flash_loan_fee_bps: Decimal = Decimal("0"), native_to_quote_rate: Decimal = Decimal("0"), min_net_bps: Decimal = Decimal("15"), telemetry=None):
         if quote_token_decimals < 0 or quote_token_decimals > 36: raise ValueError("quote_token_decimals must be between 0 and 36")
-        if Decimal(min_profit) < Decimal("0.002"): raise ValueError("min_profit cannot be below 0.002")
+        if Decimal(min_profit) < Decimal("0.005"): raise ValueError("min_profit cannot be below 0.005")
         if Decimal(max_quote_latency_ms) <= 0: raise ValueError("max_quote_latency_ms must be positive")
         if Decimal(safety_buffer_quote) < 0: raise ValueError("safety_buffer_quote cannot be negative")
         if Decimal(flash_loan_fee_bps) < 0 or Decimal(flash_loan_fee_bps) > 1000: raise ValueError("flash_loan_fee_bps must be between 0 and 1000")
@@ -118,6 +118,28 @@ class DexCrossExchangeEngine:
         self.last_rejections[reason] = self.last_rejections.get(reason, 0) + 1
         if "quote" in reason:
             self._metric("quote_failures")
+
+    def _quote_age_ms(self, quote: DexQuote) -> Decimal:
+        try:
+            observed = float(getattr(quote, "observed_at_monotonic"))
+            age = (time.monotonic() - observed) * 1000.0
+        except (TypeError, ValueError, OverflowError):
+            return Decimal("Infinity")
+        if age < 0:
+            return Decimal("Infinity")
+        return Decimal(str(age))
+
+    def _quote_fresh_ok(self, quote: DexQuote, *, stage: str) -> bool:
+        max_age = Decimal(os.getenv("DEX_MAX_QUOTE_AGE_MS", "500"))
+        if not max_age.is_finite() or max_age <= 0:
+            self._reject(f"{stage}_invalid_max_age")
+            return False
+        age = self._quote_age_ms(quote)
+        if not age.is_finite() or age > max_age:
+            self._reject(f"{stage}_stale")
+            logging.info("DEX %s quote rejected age_ms=%s limit_ms=%s", stage, age, max_age)
+            return False
+        return True
 
     def _quote_latency(self, quote: DexQuote) -> Decimal:
         try:
@@ -493,7 +515,13 @@ class DexCrossExchangeEngine:
         return [best]
 
     def scan_once(self, *, chain_id: int, quote_token: str, base_token: str, quote_amount: int, taker: str, slippage_bps: int = 50, compound_amount: int = 0, enforce_profit_gate: bool = True) -> list[DexOpportunity]:
-        if len(self.sources) < 2: raise ValueError("DEX cross-exchange mode requires at least two DEX sources")
+        if int(chain_id) == 8453:
+            required = {"aerodrome", "uniswap_v3"}
+            configured = {source.strip().lower() for source in self.sources}
+            if configured != required:
+                raise ValueError("Base 8453 opportunity engine is hard-locked to Aerodrome + Uniswap_V3")
+        if len(self.sources) != 2:
+            raise ValueError("DEX cross-exchange mode requires exactly two DEX sources")
         if quote_amount <= 0: raise ValueError("quote_amount must be positive")
         if compound_amount != 0:
             raise ValueError("Dragon is configured for no compounding; compound_amount must be zero")
@@ -544,6 +572,8 @@ class DexCrossExchangeEngine:
                         quote_latency, self.max_quote_latency_ms, source, quote_amount,
                     )
                     continue
+                if not self._quote_fresh_ok(quote, stage="buy"):
+                    continue
                 if not self._quote_quality_ok(quote, sell_token=quote_token, buy_token=base_token, sell_amount=quote_amount, stage="buy"):
                     continue
                 if execution.buy_amount <= 0:
@@ -588,6 +618,8 @@ class DexCrossExchangeEngine:
                     "DEX sell quote rejected latency_ms=%.1f limit_ms=%s source=%s amount=%s",
                     sell_latency, self.max_quote_latency_ms, source, buy_execution.buy_amount,
                 )
+                return
+            if not self._quote_fresh_ok(sell_quote, stage="sell"):
                 return
             if not self._quote_quality_ok(sell_quote, sell_token=base_token, buy_token=quote_token, sell_amount=buy_execution.buy_amount, stage="sell"):
                 return
