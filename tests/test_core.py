@@ -64,3 +64,30 @@ def test_quote_adapters_are_isolated():
   ("uniswap_v3",False,None),
   ("sushiswap",True,"sushi"),
  ]
+
+
+def test_analysis_scanners_are_isolated():
+ from dragon.scanners.isolated import IsolatedAnalysisScanner, AnalysisScannerRegistry
+ good=IsolatedAnalysisScanner("liquidity",lambda c: True)
+ bad=IsolatedAnalysisScanner("gas",lambda c: (_ for _ in ()).throw(RuntimeError("gas unavailable")))
+ other=IsolatedAnalysisScanner("staleness",lambda c: True)
+ results=AnalysisScannerRegistry([good,bad,other]).scan_all({})
+ assert [(x.name,x.ok,x.value) for x in results]==[
+  ("liquidity",True,True),
+  ("gas",False,None),
+  ("staleness",True,True),
+ ]
+
+def test_builtin_scanner_set_is_explicit():
+ from dragon.scanners.builtin import BUILTIN_SCANNERS
+ assert tuple(name for name, _ in BUILTIN_SCANNERS)==(
+  "liquidity","price_impact","gas","staleness",
+  "execution","profit","simulation","sizing",
+ )
+
+def test_profit_scanner_enforces_floor():
+ from dragon.scanners.builtin import ScannerContext, profit_scan
+ c=ScannerContext(True,True,Decimal("0.01"),0,1,True,Decimal("0.006"),Decimal("0.005"),True,1)
+ assert profit_scan(c)==Decimal("0.006")
+ c2=ScannerContext(True,True,Decimal("0.01"),0,1,True,Decimal("0.004"),Decimal("0.005"),True,1)
+ with pytest.raises(ValueError): profit_scan(c2)
