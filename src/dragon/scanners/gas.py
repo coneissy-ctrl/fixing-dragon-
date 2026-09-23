@@ -69,7 +69,7 @@ def make_isolated_gas_scanners(
     native_price_fns: dict[str, Callable[[Any], Decimal]],
     gas_ceiling_usd: Decimal = Decimal("0"),
 ) -> dict[str, IsolatedGasScanner]:
-    missing = ALLOWED_VENUES - set(estimate_fns) - set(gas_price_fns) - set(native_price_fns)
+    missing = ALLOWED_VENUES - (set(estimate_fns) & set(gas_price_fns) & set(native_price_fns))
     if missing:
         raise ValueError(f"missing gas functions for venues: {sorted(missing)}")
     return {
