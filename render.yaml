@@ -26,8 +26,6 @@ services:
         sync: false
       - key: DEX_CHAINS
         value: "8453"
-      - key: NONEVM_CHAINS
-        value: "solana"
       - key: JUPITER_QUOTE_URL
         value: "https://api.jup.ag/swap/v1/quote"
       - key: ALCHEMY_API_KEY
