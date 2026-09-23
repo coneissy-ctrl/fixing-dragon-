@@ -82,12 +82,6 @@ EVM_VENUES: dict[int, tuple[Venue, ...]] = {
     8453: (
         Venue(name="Uniswap_V3", kind="v3", router="0x2626664c2603336E57B271c5C0b26F421741e481", factory="0x33128a8fC17869897dcE68Ed026d694621f6FDfD", quoter="0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a", fee_tiers=(100, 500, 3000, 10000)),
         Venue(name="Aerodrome", kind="stable", router="0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43", factory="0x420DD381b31aEf6683db6B902084cB0FFECe40Da"),
-        Venue(name="PancakeSwap_V3", kind="v3", router="0x1b81D678ffb9C0263b24A97847620C99d213eB14", quoter="0xB048Bbc1Ee6b733FFfCFb9e9CeF7375518e25997", fee_tiers=(100, 500, 2500, 10000)),
-        Venue(name="SushiSwap_V3", kind="v3", router="0xFB7eF66a7e61224DD6FcD0D7d9C3be5C8B049b9f", factory="0xc35DADB65012eC5796536bD9864eD8773aBc74C4", quoter="0xb1E835Dc2785b52265711e17fCCb0fd018226a6e", fee_tiers=(100, 500, 3000, 10000)),
-        Venue(name="SushiSwap_V2", kind="v2", router="0x6BDED42c6DA8FBf0d2bA55B2fa120C5e0c8D7891"),
-        Venue(name="Uniswap_V2", kind="v2", router="0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24", factory="0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6"),
-        Venue(name="BaseSwap_V2", kind="v2", router="0x327Df1E6de05895d2ab08513aaDD9313Fe505d86", factory="0xFDa619b6d20975be80A10332cD39b9a4b0FAa8BB"),
-        Venue(name="SwapBased_V2", kind="v2", router="0xaaa3b1F1bd7BCc97fD1917c18ADE665C5D31F066"),
     ),
     81457: (
         Venue(name="Thruster_V2", kind="v2", router="0x98994a9A7a2570367554589189dC9772241650f6"),
