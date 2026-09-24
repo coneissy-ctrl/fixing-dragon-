@@ -796,6 +796,11 @@ def opportunity_view(opportunity, identifier, chain_label, quote_decimals):
         "gas_cost_quote": str(opportunity.gas_cost_quote),
         "flash_loan_fee_quote": str(opportunity.flash_loan_fee_quote),
         "safety_buffer_quote": str(opportunity.safety_buffer_quote),
+        "quote_age_ms": str(getattr(opportunity, "quote_age_ms", "0")),
+        "quote_latency_ms": str(getattr(opportunity, "quote_latency_ms", "0")),
+        "slippage_bps": str(getattr(opportunity, "slippage_bps", "0")),
+        "liquidity_factor": str(getattr(opportunity, "liquidity_factor", "1")),
+        "execution_horizon_ms": os.getenv("DEX_EXECUTION_HORIZON_MS", "500"),
         "status": "ready_for_fresh_simulation",
     }
 
