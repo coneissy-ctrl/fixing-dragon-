@@ -810,7 +810,7 @@ async def scan_evm_chain(adapter, chain_id, *, max_quote, taker, slippage, min_p
     quote_token, quote_decimals = _quote_token_for(chain_id)
     base_tokens = _base_tokens_for(chain_id)
     if int(chain_id) == 8453:
-        # Universe refresh performs block-log discovery. Keep it off the async event loop\n        # so a slow/dead RPC can never stall the live quote scanner.\n        base_tokens = await to_thread(BASE_UNIVERSE.tokens, adapter, quote_token, base_tokens)
+        # Universe refresh performs block-log discovery. Keep it off the async event loop.\n        # so a slow/dead RPC can never stall the live quote scanner.\n        base_tokens = await to_thread(BASE_UNIVERSE.tokens, adapter, quote_token, base_tokens)
     venue_names = configured_base_venues(chain_id)
     flash_enabled = env_bool("FLASH_LOAN_ENABLED", True)
     configured_fee_bps = env_decimal("FLASH_LOAN_FEE_BPS", "0")
