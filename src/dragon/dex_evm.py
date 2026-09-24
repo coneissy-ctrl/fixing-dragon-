@@ -303,9 +303,14 @@ class _EvmDexCore:
         self._quote_cache_ttl = max(0.0, float(os.getenv("DEX_QUOTE_CACHE_SECONDS", "0.25")))
         self.deadline_seconds = max(5, int(os.getenv("DEX_DEADLINE_SECONDS", "20")))
         self.multicall_enabled = os.getenv("DEX_MULTICALL_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
-        self.route_intermediates_enabled = os.getenv("DEX_ROUTE_INTERMEDIATES_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+        # Dragon's current Base strategy is exactly two direct legs; no route
+        # intermediates belong in the opportunity engine.
+        self.route_intermediates_enabled = False
         self.gas_limit = max(100_000, int(os.getenv("DEX_GAS_LIMIT", "300000")))
-        self.flash_loan_pool = os.getenv("DEX_AAVE_POOL_ADDRESS", "").strip()
+        self.flash_loan_pool = os.getenv("DEX_AAVE_POOL_ADDRESS", "").strip() or (
+            "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5"
+            if 8453 in tuple(chain_ids or env_chain_ids()) else ""
+        )
 
         wanted = chain_ids if chain_ids is not None else env_chain_ids()
         for cid in wanted:
