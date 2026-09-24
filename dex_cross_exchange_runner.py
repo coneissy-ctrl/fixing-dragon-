@@ -889,9 +889,9 @@ async def main():
 
         evm_chains = _enabled_evm_chains()
         nonevm_chains = _enabled_nonevm()
-        min_profit = env_decimal("DEX_MIN_NET_PROFIT", "0.0025")
-        if min_profit < Decimal("0.002"):
-            raise ValueError("DEX_MIN_NET_PROFIT cannot be below 0.002")
+        min_profit = env_decimal("DEX_MIN_NET_PROFIT", "0.005")
+        if min_profit < Decimal("0.005"):
+            raise ValueError("DEX_MIN_NET_PROFIT cannot be below 0.005")
         safety = Decimal("0")
         slippage = int(os.getenv("DEX_SLIPPAGE_BPS", "50"))
         flash_cap_quote = env_decimal("DEX_FLASH_LOAN_LIQUIDITY_QUOTE", "10000")
@@ -899,9 +899,9 @@ async def main():
             raise ValueError("DEX_FLASH_LOAN_LIQUIDITY_QUOTE must be positive")
         taker = os.getenv("DEX_TAKER_ADDRESS", "").strip() or "0x000000000000000000000000000000000000dEaD"
         poll = max(0.10, float(os.getenv("DEX_POLL_SECONDS", "0.25")))
-        min_profit_floor = env_decimal("DEX_MIN_NET_PROFIT_FLOOR", "0.002")
-        if min_profit_floor < Decimal("0.002"):
-            raise ValueError("DEX_MIN_NET_PROFIT_FLOOR cannot be below 0.002")
+        min_profit_floor = env_decimal("DEX_MIN_NET_PROFIT_FLOOR", "0.005")
+        if min_profit_floor < Decimal("0.005"):
+            raise ValueError("DEX_MIN_NET_PROFIT_FLOOR cannot be below 0.005")
         dynamic_profit = env_bool("DEX_DYNAMIC_MIN_PROFIT", True)
         logging.info("Dragon fast scan cadence configured at %.2fs dynamic_profit=%s floor=%s no_trade_size_ceiling=true", poll, dynamic_profit, min_profit_floor)
         # Hard policy: direct two-leg Base opportunities only. Config cannot re-enable cycles.\n        triangular_enabled = False
