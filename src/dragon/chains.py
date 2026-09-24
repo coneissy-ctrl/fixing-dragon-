@@ -57,31 +57,45 @@ def get_spec(chain_id: int) -> ChainSpec:
 def rpc_urls(spec: ChainSpec) -> list[str]:
     primary = os.getenv(spec.rpc_env, "").strip()
     fallbacks = [x.strip() for x in os.getenv(spec.rpc_fallback_env, "").split(",") if x.strip()]
+    # Never carry the known-bad Llama endpoint into the live Base quote path,
+    # even if it remains in an older DEX_RPC_URLS environment value.
+    blocked = {"https://base.llamarpc.com"}
     urls: list[str] = []
     for url in [primary, *fallbacks]:
-        if url and url not in urls:
+        if url and url not in blocked and url not in urls:
             urls.append(url)
-
-    # Base-only runtime: keep public fallbacks independent, but do not include
-    # the unreliable llama endpoint that was observed failing in production.
-    # Authenticated providers (Alchemy/Infura/QuickNode) are still preferred
-    # when no explicit endpoint is pinned.
-    if spec.chain_id == 8453 and os.getenv("DEX_RPC_AUTO_FALLBACK", "false").strip().lower() in {"1","true","yes","on"}:
-        for url in ("https://mainnet.base.org","https://base-rpc.publicnode.com","https://1rpc.io/base"):
-            if url not in urls:
-                urls.append(url)
-        return urls
-    if urls:
-        return urls
 
     from src.dragon.rpc_providers import load_providers, private_urls
-    for url in private_urls(spec.chain_id, load_providers()):
-        if url not in urls:
-            urls.append(url)
+    private = [u for u in private_urls(spec.chain_id, load_providers()) if u not in blocked]
+
+    # Authenticated providers are preferred before public fallbacks. An explicit
+    # DEX_RPC_URL remains first because it is an intentional operator pin.
     if spec.chain_id == 8453:
-        for url in ("https://base-rpc.publicnode.com","https://1rpc.io/base"):
+        explicit = list(urls)
+        urls = []
+        if primary and primary not in blocked:
+            urls.append(primary)
+        for url in private:
             if url not in urls:
                 urls.append(url)
+        for url in explicit:
+            if url not in urls:
+                urls.append(url)
+        if os.getenv("DEX_RPC_AUTO_FALLBACK", "false").strip().lower() in {"1","true","yes","on"}:
+            for url in ("https://mainnet.base.org","https://base-rpc.publicnode.com","https://1rpc.io/base"):
+                if url not in urls:
+                    urls.append(url)
+        elif not urls:
+            for url in ("https://base-rpc.publicnode.com","https://1rpc.io/base"):
+                if url not in urls:
+                    urls.append(url)
+        return urls
+
+    if urls:
+        return urls
+    for url in private:
+        if url not in urls:
+            urls.append(url)
     if not urls and spec.default_rpc:
         urls.append(spec.default_rpc)
     return urls
