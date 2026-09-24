@@ -34,6 +34,7 @@ from src.dragon.aerodrome_opportunity import AerodromeOpportunityEngine, snapsho
 from src.dragon.economic_agent import EconomicDecisionAgent
 from src.dragon.dragon_core import DragonCore, ChainState, EconomicCandidate, ThreeBrainEngines
 from src.dragon.base_live import BaseLiveReader
+from src.dragon.gas_scanner import GasScanner
 from src.dragon.five_circle_engine import FiveCircleEngine
 from src.dragon.base_proof_engine import BaseProofEngine
 from src.dragon.base_atomic_simulator import BaseAtomicSimulator
@@ -76,6 +77,7 @@ STATE = {
     "dragon_core": {},
     "brain_engines": {},
     "base_live": {},
+    "gas_scanner": {"enabled": True, "last_scan": None, "passed": 0, "rejected": 0, "error": None},
     "five_circle": {"rotation": 0, "status": "waiting", "selected": None, "decisions": []},
 }
 LOCK = Lock()
@@ -889,19 +891,19 @@ async def main():
 
         evm_chains = _enabled_evm_chains()
         nonevm_chains = _enabled_nonevm()
-        min_profit = env_decimal("DEX_MIN_NET_PROFIT", "0.0025")
-        if min_profit < Decimal("0.002"):
-            raise ValueError("DEX_MIN_NET_PROFIT cannot be below 0.002")
+        min_profit = env_decimal("DEX_MIN_NET_PROFIT", "0.005")
+        if min_profit < Decimal("0.005"):
+            raise ValueError("DEX_MIN_NET_PROFIT cannot be below 0.005")
         safety = Decimal("0")
         slippage = int(os.getenv("DEX_SLIPPAGE_BPS", "50"))
-        flash_cap_quote = env_decimal("DEX_FLASH_LOAN_LIQUIDITY_QUOTE", "10000")
+        flash_cap_quote = env_decimal("DEX_FLASH_LOAN_LIQUIDITY_QUOTE", "1000000000")
         if flash_cap_quote <= 0:
             raise ValueError("DEX_FLASH_LOAN_LIQUIDITY_QUOTE must be positive")
         taker = os.getenv("DEX_TAKER_ADDRESS", "").strip() or "0x000000000000000000000000000000000000dEaD"
-        poll = max(1.0, float(os.getenv("DEX_POLL_SECONDS", "30")))
-        min_profit_floor = env_decimal("DEX_MIN_NET_PROFIT_FLOOR", "0.002")
-        if min_profit_floor < Decimal("0.002"):
-            raise ValueError("DEX_MIN_NET_PROFIT_FLOOR cannot be below 0.002")
+        poll = max(0.10, float(os.getenv("DEX_POLL_SECONDS", "0.25")))
+        min_profit_floor = env_decimal("DEX_MIN_NET_PROFIT_FLOOR", "0.005")
+        if min_profit_floor < Decimal("0.005"):
+            raise ValueError("DEX_MIN_NET_PROFIT_FLOOR cannot be below 0.005")
         dynamic_profit = env_bool("DEX_DYNAMIC_MIN_PROFIT", True)
         logging.info("Dragon opportunity scan cycle configured at %.1fs dynamic_profit=%s floor=%s no_ceiling=true", poll, dynamic_profit, min_profit_floor)
         # Hard policy: direct two-leg Base opportunities only. Config cannot re-enable cycles.\n        triangular_enabled = False
@@ -936,6 +938,7 @@ async def main():
         )
         brain_engines.last_stage = "ready"
         base_reader = BaseLiveReader()
+        gas_scanner = GasScanner()
         rotation = 0
 
         stable_vaults = []
@@ -1063,7 +1066,7 @@ async def main():
                     logging.info("Dragon cycle=%s dynamic min_net_profit=%s floor=%s no_ceiling=true", rotation, min_profit, cycle_profit_floor)
                 all_found = []
                 try:
-                    base_snapshot = await to_thread(base_reader.snapshot)
+                    base_snapshot = await to_thread(base_reader.fast_snapshot)
                     base_chain = ChainState(chain_id=8453, block_number=base_snapshot["block_number"], block_timestamp=base_snapshot["block_timestamp"], gas_quote=Decimal(str(base_snapshot.get("base_fee_wei", "0"))), rpc_latency_ms=Decimal(str(base_snapshot["rpc_latency_ms"])))
                     dragon_core.observe_chain(base_chain)
                     with LOCK:
@@ -1198,6 +1201,34 @@ async def main():
                     _, rej = await scan_nonevm_chain(adapter, family, slippage=slippage)
                     for k, v in rej.items():
                         rejections[k] = rejections.get(k, 0) + int(v)
+                merge_rejections(rejections)
+
+                # Isolated gas scanner: dedicated RPC/failover path. Any gas-scanner
+                # failure fails closed for execution without blocking quote discovery.
+                gas_checked = []
+                gas_passed = 0
+                gas_rejected = 0
+                gas_error = None
+                for opp, label in all_found:
+                    if getattr(opp, "chain_id", None) != 8453 or hasattr(opp, "route"):
+                        gas_rejected += 1
+                        rejections["gas_invalid_route"] = rejections.get("gas_invalid_route", 0) + 1
+                        continue
+                    try:
+                        gas_result = await to_thread(gas_scanner.scan_opportunity, opp, min_profit=min_profit)
+                        if gas_result["passed"]:
+                            gas_passed += 1
+                            gas_checked.append((opp, label))
+                        else:
+                            gas_rejected += 1
+                            rejections["gas_ceiling"] = rejections.get("gas_ceiling", 0) + 1
+                    except Exception as exc:
+                        gas_rejected += 1
+                        gas_error = f"{type(exc).__name__}: {exc}"
+                        rejections["gas_scanner_failure"] = rejections.get("gas_scanner_failure", 0) + 1
+                with LOCK:
+                    STATE["gas_scanner"] = {"enabled": True, "last_scan": gas_scanner.last_scan, "passed": gas_passed, "rejected": gas_rejected, "error": gas_error}
+                all_found = gas_checked
                 merge_rejections(rejections)
                 brain_engines.last_stage = "economics"
                 # Five-circle gate: fast discovery/optimization, adversarial stress,
