@@ -1007,7 +1007,7 @@ async def main():
         with LOCK:
             STATE.update({
                 "status": "running",
-                "triangular_enabled": triangular_enabled,
+                "triangular_enabled": False,
                 "gas_sponsor_enabled": env_bool("GAS_SPONSOR_ENABLED", True),
                 "gas_sponsor_required": env_bool("GAS_SPONSOR_REQUIRED", False),
                 "execution_capacity": capacity.current,
