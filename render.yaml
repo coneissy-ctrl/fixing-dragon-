@@ -61,7 +61,7 @@ services:
       - key: DEX_SLIPPAGE_BPS
         value: "50"
       - key: DEX_POLL_SECONDS
-        value: "1"
+        value: "0.25"
       - key: DEX_QUOTE_CACHE_SECONDS
         value: "0"
       - key: DEX_HARD_QUOTE_DEADLINE_MS
@@ -76,6 +76,22 @@ services:
         value: "2"
       - key: DEX_RPC_TIMEOUT_SECONDS
         value: "0.4"
+      - key: DEX_GAS_RPC_URL
+        value: ""
+      - key: DEX_GAS_RPC_URLS
+        value: ""
+      - key: DEX_GAS_RPC_TIMEOUT_SECONDS
+        value: "0.4"
+      - key: DEX_GAS_RPC_MAX_ATTEMPTS
+        value: "4"
+      - key: DEX_GAS_RPC_MAX_INFLIGHT
+        value: "2"
+      - key: DEX_GAS_RPC_COOLDOWN_SECONDS
+        value: "3"
+      - key: DEX_GAS_EXECUTION_OVERHEAD
+        value: "1.10"
+      - key: DEX_NATIVE_TO_QUOTE_RATE
+        value: "0"
       - key: DEX_RPC_PROVIDER_MAX_INFLIGHT
         value: "2"
       - key: DRAGON_BASE_VENUES
@@ -109,7 +125,7 @@ services:
       - key: MEV_PROTECTION_REQUIRED
         value: "true"
       - key: DEX_COMPOUND_PROFITS
-        value: "true"
+        value: "false"
       - key: DEX_COMPOUND_RATIO
         value: "1"
       - key: DEX_MAX_COMPOUND_QUOTE
