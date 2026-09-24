@@ -814,7 +814,7 @@ async def scan_evm_chain(adapter, chain_id, *, max_quote, taker, slippage, min_p
         # so a slow/dead RPC can never stall the live quote scanner.
         base_tokens = await to_thread(BASE_UNIVERSE.tokens, adapter, quote_token, base_tokens)
     venue_names = configured_base_venues(chain_id)
-    flash_enabled = env_bool("FLASH_LOAN_ENABLED", True)
+    flash_enabled = env_bool("FLASH_LOAN_ENABLED", False)
     configured_fee_bps = env_decimal("FLASH_LOAN_FEE_BPS", "0")
     fee_bps = configured_fee_bps
     if flash_enabled and hasattr(adapter, "evm") and adapter.evm is not None:
@@ -928,7 +928,7 @@ async def main():
             base_discovery_venues,
             min_profit=min_profit,
             quote_token_decimals=6,
-            flash_loan_enabled=env_bool("FLASH_LOAN_ENABLED", True),
+            flash_loan_enabled=env_bool("FLASH_LOAN_ENABLED", False),
             flash_loan_fee_bps=env_decimal("FLASH_LOAN_FEE_BPS", "0"),
             telemetry=METRICS,
         )
@@ -1020,7 +1020,7 @@ async def main():
                 "safety_buffer": str(safety),
                 "flash_cap": str(flash_cap_quote),
                 "flash_cap_unit": "human quote units",
-                "flash_loan_enabled": env_bool("FLASH_LOAN_ENABLED", True),
+                "flash_loan_enabled": env_bool("FLASH_LOAN_ENABLED", False),
                 "compounding_enabled": env_bool("DEX_COMPOUND_PROFITS", False),
                 "rpc_providers": provider_status(load_providers()),
                 "rpc_hosts": {
@@ -1098,13 +1098,13 @@ async def main():
                         # the cheap ranking. A configured fee is only a fallback
                         # when flash loans are disabled.
                         fee_bps = env_decimal("FLASH_LOAN_FEE_BPS", "0")
-                        if env_bool("FLASH_LOAN_ENABLED", True) and hasattr(adapter, "evm") and adapter.evm is not None:
+                        if env_bool("FLASH_LOAN_ENABLED", False) and hasattr(adapter, "evm") and adapter.evm is not None:
                             fee_bps = Decimal(str(adapter.evm.flash_loan_fee_bps(cid)))
                         venue_names = configured_base_venues(cid)
                         engine = DexCrossExchangeEngine(
                             adapter, venue_names, min_profit=min_profit,
                             quote_token_decimals=quote_decimals,
-                            flash_loan_enabled=env_bool("FLASH_LOAN_ENABLED", True),
+                            flash_loan_enabled=env_bool("FLASH_LOAN_ENABLED", False),
                             flash_loan_fee_bps=fee_bps, telemetry=METRICS,
                         )
                         best = Decimal("-Infinity")
