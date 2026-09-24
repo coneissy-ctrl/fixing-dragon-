@@ -86,7 +86,10 @@ class FlashLoanConfig:
 
 def env_flash_loan_config() -> FlashLoanConfig:
     enabled = os.getenv("FLASH_LOAN_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
-    pool = os.getenv("DEX_AAVE_POOL_ADDRESS", "").strip()
+    pool = os.getenv("DEX_AAVE_POOL_ADDRESS", "").strip() or (
+        "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5"
+        if os.getenv("CHAIN_ID", "8453").strip() == "8453" else ""
+    )
     executor = os.getenv("DEX_EXECUTOR_ADDRESS", "").strip()
     owner = os.getenv("DEX_EXECUTOR_OWNER_ADDRESS", "").strip()
     min_profit = Decimal(os.getenv("DEX_MIN_NET_PROFIT", "0.005"))
