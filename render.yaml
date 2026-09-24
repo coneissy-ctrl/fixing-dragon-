@@ -26,13 +26,9 @@ services:
         sync: false
       - key: DEX_CHAINS
         value: "8453"
-      - key: JUPITER_QUOTE_URL
-        value: "https://api.jup.ag/swap/v1/quote"
       - key: ALCHEMY_API_KEY
         sync: false
       - key: INFURA_API_KEY
-        sync: false
-      - key: JUPITER_API_KEY
         sync: false
       - key: QUICKNODE_API_KEY
         sync: false
@@ -78,8 +74,16 @@ services:
         value: "0.4"
       - key: DEX_GAS_RPC_URL
         value: ""
+      - key: DEX_GAS_RPC_URLS
+        value: ""
       - key: DEX_GAS_RPC_TIMEOUT_SECONDS
         value: "0.4"
+      - key: DEX_GAS_RPC_MAX_ATTEMPTS
+        value: "4"
+      - key: DEX_GAS_RPC_MAX_INFLIGHT
+        value: "2"
+      - key: DEX_GAS_RPC_COOLDOWN_SECONDS
+        value: "3"
       - key: DEX_GAS_EXECUTION_OVERHEAD
         value: "1.10"
       - key: DEX_NATIVE_TO_QUOTE_RATE
