@@ -34,6 +34,7 @@ from src.dragon.aerodrome_opportunity import AerodromeOpportunityEngine, snapsho
 from src.dragon.economic_agent import EconomicDecisionAgent
 from src.dragon.dragon_core import DragonCore, ChainState, EconomicCandidate, ThreeBrainEngines
 from src.dragon.base_live import BaseLiveReader
+from src.dragon.gas_scanner import GasScanner
 from src.dragon.five_circle_engine import FiveCircleEngine
 from src.dragon.base_proof_engine import BaseProofEngine
 from src.dragon.base_atomic_simulator import BaseAtomicSimulator
@@ -76,6 +77,7 @@ STATE = {
     "dragon_core": {},
     "brain_engines": {},
     "base_live": {},
+    "gas_scanner": {"enabled": True, "last_scan": None, "passed": 0, "rejected": 0, "error": None},
     "five_circle": {"rotation": 0, "status": "waiting", "selected": None, "decisions": []},
 }
 LOCK = Lock()
@@ -936,6 +938,7 @@ async def main():
         )
         brain_engines.last_stage = "ready"
         base_reader = BaseLiveReader()
+        gas_scanner = GasScanner()
         rotation = 0
 
         stable_vaults = []
@@ -1198,6 +1201,44 @@ async def main():
                     _, rej = await scan_nonevm_chain(adapter, family, slippage=slippage)
                     for k, v in rej.items():
                         rejections[k] = rejections.get(k, 0) + int(v)
+                merge_rejections(rejections)
+
+                # Isolated gas scanner: its RPC and lifecycle are independent
+                # from DEX quote scanners. Gas failure therefore fails closed
+                # for Base execution without blocking quote discovery.
+                gas_checked = []
+                gas_passed = 0
+                gas_rejected = 0
+                gas_error = None
+                for opp, label in all_found:
+                    if getattr(opp, "chain_id", None) != 8453 or hasattr(opp, "route"):
+                        gas_checked.append((opp, label))
+                        continue
+                    try:
+                        gas_result = await to_thread(
+                            gas_scanner.scan_opportunity,
+                            opp,
+                            min_profit=min_profit,
+                        )
+                        if gas_result["passed"]:
+                            gas_passed += 1
+                            gas_checked.append((opp, label))
+                        else:
+                            gas_rejected += 1
+                            rejections["gas_ceiling"] = rejections.get("gas_ceiling", 0) + 1
+                    except Exception as exc:
+                        gas_rejected += 1
+                        gas_error = f"{type(exc).__name__}: {exc}"
+                        rejections["gas_scanner_failure"] = rejections.get("gas_scanner_failure", 0) + 1
+                with LOCK:
+                    STATE["gas_scanner"] = {
+                        "enabled": True,
+                        "last_scan": gas_scanner.last_scan,
+                        "passed": gas_passed,
+                        "rejected": gas_rejected,
+                        "error": gas_error,
+                    }
+                all_found = gas_checked
                 merge_rejections(rejections)
                 brain_engines.last_stage = "economics"
                 # Five-circle gate: fast discovery/optimization, adversarial stress,
