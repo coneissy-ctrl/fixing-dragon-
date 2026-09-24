@@ -76,6 +76,14 @@ services:
         value: "2"
       - key: DEX_RPC_TIMEOUT_SECONDS
         value: "0.4"
+      - key: DEX_GAS_RPC_URL
+        value: ""
+      - key: DEX_GAS_RPC_TIMEOUT_SECONDS
+        value: "0.4"
+      - key: DEX_GAS_EXECUTION_OVERHEAD
+        value: "1.10"
+      - key: DEX_NATIVE_TO_QUOTE_RATE
+        value: "0"
       - key: DEX_RPC_PROVIDER_MAX_INFLIGHT
         value: "2"
       - key: DRAGON_BASE_VENUES
