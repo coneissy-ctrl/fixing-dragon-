@@ -898,12 +898,12 @@ async def main():
         if flash_cap_quote <= 0:
             raise ValueError("DEX_FLASH_LOAN_LIQUIDITY_QUOTE must be positive")
         taker = os.getenv("DEX_TAKER_ADDRESS", "").strip() or "0x000000000000000000000000000000000000dEaD"
-        poll = max(1.0, float(os.getenv("DEX_POLL_SECONDS", "30")))
+        poll = max(0.10, float(os.getenv("DEX_POLL_SECONDS", "0.25")))
         min_profit_floor = env_decimal("DEX_MIN_NET_PROFIT_FLOOR", "0.002")
         if min_profit_floor < Decimal("0.002"):
             raise ValueError("DEX_MIN_NET_PROFIT_FLOOR cannot be below 0.002")
         dynamic_profit = env_bool("DEX_DYNAMIC_MIN_PROFIT", True)
-        logging.info("Dragon opportunity scan cycle configured at %.1fs dynamic_profit=%s floor=%s no_ceiling=true", poll, dynamic_profit, min_profit_floor)
+        logging.info("Dragon fast scan cadence configured at %.2fs dynamic_profit=%s floor=%s no_trade_size_ceiling=true", poll, dynamic_profit, min_profit_floor)
         # Hard policy: direct two-leg Base opportunities only. Config cannot re-enable cycles.\n        triangular_enabled = False
         capacity = ExecutionCapacity(initial=int(os.getenv("DEX_MAX_EXECUTION_CONCURRENCY", "8")), maximum=None)
         sponsor_manager = GasSponsorManager(min_net_profit=min_profit)
@@ -1063,7 +1063,7 @@ async def main():
                     logging.info("Dragon cycle=%s dynamic min_net_profit=%s floor=%s no_ceiling=true", rotation, min_profit, cycle_profit_floor)
                 all_found = []
                 try:
-                    base_snapshot = await to_thread(base_reader.snapshot)
+                    base_snapshot = await to_thread(base_reader.fast_snapshot)
                     base_chain = ChainState(chain_id=8453, block_number=base_snapshot["block_number"], block_timestamp=base_snapshot["block_timestamp"], gas_quote=Decimal(str(base_snapshot.get("base_fee_wei", "0"))), rpc_latency_ms=Decimal(str(base_snapshot["rpc_latency_ms"])))
                     dragon_core.observe_chain(base_chain)
                     with LOCK:
