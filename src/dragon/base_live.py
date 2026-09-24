@@ -44,6 +44,26 @@ class BaseLiveReader:
         self.w3 = Web3(Web3.HTTPProvider(self.rpc_url, request_kwargs={"timeout": timeout}))
         self.pool = self.w3.eth.contract(address=AAVE_V3_BASE_POOL, abi=POOL_ABI)
 
+    def fast_snapshot(self) -> dict:
+        """Fast Base state read for the latency-sensitive DEX path.
+
+        Aave reserve enumeration is intentionally excluded; that expensive
+        intelligence belongs to the isolated background path.
+        """
+        started = time.perf_counter()
+        chain_id = int(self.w3.eth.chain_id)
+        if chain_id != BASE_CHAIN_ID:
+            raise RuntimeError(f"wrong Base chain id: expected {BASE_CHAIN_ID}, got {chain_id}")
+        block = self.w3.eth.get_block("latest")
+        return {
+            "connected": True,
+            "chain_id": chain_id,
+            "block_number": int(block["number"]),
+            "block_timestamp": int(block["timestamp"]),
+            "base_fee_wei": str(block.get("baseFeePerGas", 0)),
+            "rpc_latency_ms": round((time.perf_counter() - started) * 1000, 2),
+        }
+
     def snapshot(self) -> dict:
         started = time.perf_counter()
         chain_id = int(self.w3.eth.chain_id)
