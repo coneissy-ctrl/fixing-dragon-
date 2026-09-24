@@ -296,8 +296,8 @@ class _EvmDexCore:
         self._venues: dict[int, dict[str, Venue]] = {}
         self._contracts: dict[tuple[int, str], object] = {}
         self._quote_cache: dict[tuple, tuple[float, tuple]] = {}
-        self._pair_capability_cache: dict[tuple[int, str, str, str], float] = {}
-        self._pair_capability_ttl = max(2.0, float(os.getenv("DEX_PAIR_CAPABILITY_TTL_SECONDS", "15")))
+        self._pair_capability_cache: dict[tuple[int, str, str, str, int], float] = {}
+        self._pair_capability_ttl = max(0.0, float(os.getenv("DEX_PAIR_CAPABILITY_TTL_SECONDS", "2")))
         self._native_rate_cache: dict[tuple, tuple[float, Decimal]] = {}
         self._gas_cache: dict[int, tuple[float, int]] = {}
         self._quote_cache_ttl = max(0.0, float(os.getenv("DEX_QUOTE_CACHE_SECONDS", "0.25")))
@@ -614,7 +614,7 @@ class EvmDexAdapter(_EvmDexCore):
         if int(sell_amount) <= 0:
             raise ValueError("sell_amount must be positive")
 
-        capability_key = (int(chain_id), source, sell_token.lower(), buy_token.lower())
+        capability_key = (int(chain_id), source, sell_token.lower(), buy_token.lower(), int(sell_amount))
         capability_until = self._pair_capability_cache.get(capability_key, 0.0)
         if capability_until > time.monotonic():
             raise RuntimeError(f"no {source} liquidity for pair (cached capability miss)")
