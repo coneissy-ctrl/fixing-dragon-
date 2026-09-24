@@ -11,6 +11,7 @@ It never signs or broadcasts transactions.
 """
 
 import math
+import os
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
@@ -127,9 +128,11 @@ class EconomicDecisionAgent:
     def _freshness(age_ms: Decimal, block_age_ms: Decimal) -> Decimal:
         age = max(Decimal("0"), age_ms)
         block_age = max(Decimal("0"), block_age_ms)
-        # Exponential decay avoids a discontinuous cliff while making stale
-        # opportunities progressively less valuable.
-        return Decimal(str(math.exp(-float((age + block_age) / Decimal("1000")))))
+        # Theory-derived execution horizon: the value of an observed spread
+        # decays continuously as information becomes stale. For Dragon's atomic
+        # DEX-DEX path, this is a quote/inclusion horizon rather than a CEX hedge.
+        horizon = max(Decimal("50"), Decimal(os.getenv("DEX_EXECUTION_HORIZON_MS", "500")))
+        return Decimal(str(math.exp(-float((age + block_age) / horizon))))
 
     @staticmethod
     def _latency_factor(latency_ms: Decimal) -> Decimal:
@@ -152,9 +155,13 @@ class EconomicDecisionAgent:
 
         quote_age = _d(getattr(opportunity, "quote_age_ms", 0))
         freshness = self._freshness(quote_age, state.block_age_ms)
-        latency_factor = self._latency_factor(observed_latency)
+        opportunity_latency = _d(getattr(opportunity, "quote_latency_ms", 0))
+        latency_factor = self._latency_factor(max(observed_latency, opportunity_latency))
 
-        liquidity = _clamp01(state.liquidity_factor)
+        # Use realized quote quality as the liquidity signal. Higher slippage
+        # means the opportunity cannot be scaled safely, matching the paper's
+        # liquidity/extractable-value result.
+        liquidity = _clamp01(_d(getattr(opportunity, "liquidity_factor", state.liquidity_factor), state.liquidity_factor))
         gas_vol = Decimal("1") / (Decimal("1") + max(Decimal("0"), state.gas_volatility_bps) / Decimal("10000"))
 
         # net_profit_quote is already costed. We therefore do not subtract gas or
@@ -180,6 +187,7 @@ class EconomicDecisionAgent:
             economic_priority=priority,
             reason=(
                 f"net={net};expected={expected};execution_probability={execution_probability};"
+                f"execution_horizon_ms={max(Decimal('50'), Decimal(os.getenv('DEX_EXECUTION_HORIZON_MS', '500')))};"
                 f"freshness={freshness};latency_factor={latency_factor};"
                 f"liquidity={liquidity};gas_volatility_factor={gas_vol}"
             ),
