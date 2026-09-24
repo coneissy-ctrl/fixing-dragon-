@@ -31,8 +31,8 @@ position:
   sizing: flash_liquidity_dynamic
   dynamic_sizing: true
   min_flash_loan_quote: 100
-  max_flash_loan_quote: 3000
-  compound_realized_pnl: true
+  max_flash_loan_quote: 1000000000
+  compound_realized_pnl: false
 
 execution:
   continuous_scanning: true
@@ -45,6 +45,6 @@ execution:
   atomic_repayment_required: true
 
 runtime:
-  poll_interval_ms: 100
+  poll_interval_ms: 250
   max_concurrent_pairs: 128
   log_level: INFO
