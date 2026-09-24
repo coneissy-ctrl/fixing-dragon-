@@ -31,6 +31,10 @@ class DexOpportunity:
     second_leg: DexExecution
     compound_amount: int = 0
     flash_multiplier: Decimal = Decimal("0")
+    quote_age_ms: Decimal = Decimal("0")
+    quote_latency_ms: Decimal = Decimal("0")
+    slippage_bps: Decimal = Decimal("0")
+    liquidity_factor: Decimal = Decimal("1")
 
     @property
     def flash_loan_amount(self) -> int:
@@ -58,7 +62,9 @@ class DexCrossExchangeEngine:
         self.flash_loan_enabled = bool(flash_loan_enabled)
         self.flash_loan_fee_bps = Decimal(flash_loan_fee_bps)
         self.native_to_quote_rate = Decimal(native_to_quote_rate)
-        self.min_net_bps = Decimal(os.getenv("DEX_MIN_NET_BPS", str(min_net_bps)))
+        # The economic floor is the absolute net-profit gate. Avoid a second
+        # arbitrary bps floor that can reject small but genuinely profitable trades.
+        self.min_net_bps = Decimal("0")
         self.telemetry = telemetry
         # Keep isolated RPC/Web3 adapters alive across scans. Rebuilding them per
         # candidate caused repeated chain/factory discovery and added avoidable latency.
@@ -417,7 +423,9 @@ class DexCrossExchangeEngine:
         if max_quote_amount <= 0: raise ValueError("max_quote_amount must be positive")
         scale = Decimal(10) ** self.quote_token_decimals
         configured_min = Decimal(os.getenv("DEX_MIN_FLASH_LOAN_QUOTE", "100"))
-        configured_max = Decimal(os.getenv("DEX_MAX_FLASH_LOAN_QUOTE", "3000"))
+        # No artificial strategy ceiling: the caller's live flash-liquidity amount
+        # and actual venue liquidity determine the executable maximum.
+        configured_max = Decimal(str(max_quote_amount))
         if not configured_min.is_finite() or configured_min <= 0:
             raise ValueError("DEX_MIN_FLASH_LOAN_QUOTE must be positive")
         if not configured_max.is_finite() or configured_max < configured_min:
@@ -699,6 +707,14 @@ class DexCrossExchangeEngine:
             gross_bps = (round_trip_return - Decimal("1")) * Decimal("10000")
             cost_bps = (cost_quote / notional_quote) * Decimal("10000") if notional_quote > 0 else Decimal("0")
             net_bps = gross_bps - cost_bps
+            # Liquidity proxy from realized execution slippage. The paper shows that
+            # executable liquidity, not headline price, determines extractable value.
+            # Use a soft continuous factor for ranking; never use it to manufacture profit.
+            observed_slippage_bps = max(buy_slippage_bps, sell_slippage_bps)
+            liquidity_scale = max(Decimal("1"), Decimal(os.getenv("DEX_LIQUIDITY_SLIPPAGE_SCALE_BPS", "100")))
+            liquidity_factor = Decimal("1") / (Decimal("1") + observed_slippage_bps / liquidity_scale)
+            quote_age_ms = max(self._quote_age_ms(buy_quote), self._quote_age_ms(sell_quote))
+            quote_latency_ms = max(self._quote_latency(buy_quote), self._quote_latency(sell_quote))
             net = gross - cost_quote
             if gross > 0:
                 self._metric("opportunities_detected")
@@ -725,13 +741,6 @@ class DexCrossExchangeEngine:
             if enforce_profit_gate and net < self.min_profit:
                 self._reject("net_profit_below_min")
                 return
-            if enforce_profit_gate and net_bps < self.min_net_bps:
-                self._reject("net_bps_below_min")
-                logging.info(
-                    "DEX opportunity rejected net_bps=%.3f min_net_bps=%.3f buy=%s sell=%s amount=%s",
-                    net_bps, self.min_net_bps, buy_source, source, quote_amount,
-                )
-                return
 
             opportunities.append(DexOpportunity(
                 chain_id=chain_id,
@@ -750,6 +759,10 @@ class DexCrossExchangeEngine:
                 first_leg=buy_execution,
                 second_leg=sell_execution,
                 compound_amount=compound_amount,
+                quote_age_ms=quote_age_ms,
+                quote_latency_ms=quote_latency_ms,
+                slippage_bps=observed_slippage_bps,
+                liquidity_factor=liquidity_factor,
             ))
 
         # Sell legs are independent. Run them concurrently even when the adapter
