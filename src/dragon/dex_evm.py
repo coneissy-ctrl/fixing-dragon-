@@ -394,6 +394,31 @@ class _EvmDexCore:
             if provider and hasattr(provider, "disconnect"):
                 provider.disconnect()
 
+    def flash_loan_liquidity_quote(self, chain_id: int, quote_token: str, quote_decimals: int) -> Decimal:
+        """Read current Aave Pool underlying balance for the quote asset.
+
+        This is the real flash-loan liquidity constraint; it is not a strategy
+        ceiling. A short cache avoids hammering the pool every 250ms scan.
+        """
+        key = (int(chain_id), quote_token.lower())
+        now = time.monotonic()
+        cached = getattr(self, "_flash_liquidity_cache", {}).get(key)
+        ttl = max(0.25, float(os.getenv("DEX_FLASH_LIQUIDITY_CACHE_SECONDS", "1.0")))
+        if cached and now - cached[0] < ttl:
+            return cached[1]
+        pool_address = self._flash_loan_pool_address(chain_id)
+        if not pool_address:
+            raise RuntimeError(f"Aave V3 Pool address is not configured for chain {chain_id}")
+        abi = [{"inputs":[{"name":"account","type":"address"}],"name":"balanceOf","outputs":[{"name":"","type":"uint256"}],"stateMutability":"view","type":"function"}]
+        raw = Decimal(str(self._rpc(chain_id, lambda w3: w3.eth.contract(address=self._addr(quote_token), abi=abi).functions.balanceOf(self._addr(pool_address)).call())))
+        amount = raw / (Decimal(10) ** int(quote_decimals))
+        if not amount.is_finite() or amount <= 0:
+            raise RuntimeError(f"Aave flash-loan liquidity unavailable for quote token on chain {chain_id}")
+        if not hasattr(self, "_flash_liquidity_cache"):
+            self._flash_liquidity_cache = {}
+        self._flash_liquidity_cache[key] = (now, amount)
+        return amount
+
     def flash_loan_fee_bps(self, chain_id: int = 8453) -> Decimal:
         pool_address = self._flash_loan_pool_address(chain_id)
         if not pool_address:
