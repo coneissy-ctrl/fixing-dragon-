@@ -700,3 +700,5 @@ def _stable_flag_combinations(hops: int):
         return
     for mask in range(2 ** hops):
         yield tuple(bool(mask & (1 << i)) for i in range(hops))
+
+# Startup repair marker: keep pair capability TTL initialization inside _EvmDexCore.__init__.
