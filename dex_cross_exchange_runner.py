@@ -833,6 +833,9 @@ async def scan_evm_chain(adapter, chain_id, *, max_quote, taker, slippage, min_p
         if live_fee_bps < 0 or live_fee_bps > Decimal("1000"):
             raise ValueError(f"invalid live flash-loan fee on chain {chain_id}: {live_fee_bps} bps")
         fee_bps = live_fee_bps
+    executable_max = Decimal(str(max_quote))
+    if flash_enabled and hasattr(adapter, "evm") and hasattr(adapter.evm, "flash_loan_liquidity_quote"):
+        executable_max = min(executable_max, await to_thread(adapter.evm.flash_loan_liquidity_quote, 8453, quote_token, quote_decimals))
     engine = DexCrossExchangeEngine(
         adapter, venue_names, min_profit=min_profit, quote_token_decimals=quote_decimals,
         safety_buffer_quote=safety_buffer,
@@ -846,7 +849,7 @@ async def scan_evm_chain(adapter, chain_id, *, max_quote, taker, slippage, min_p
             opportunities = await to_thread(
                 engine.scan_max_profitable,
                 chain_id=chain_id, quote_token=quote_token, base_token=base_token,
-                max_quote_amount=max_quote, taker=taker, slippage_bps=slippage,
+                max_quote_amount=executable_max, taker=taker, slippage_bps=slippage,
             )
             found.extend(opportunities)
         except Exception as exc:
