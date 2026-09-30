@@ -153,7 +153,48 @@ class DerivOptionsDemo(ExecutionAdapter):
         await self.connect_market_data()
         await self.connect_account()
 
+    async def set_oauth_token(self, access_token: str) -> None:
+        if not access_token:
+            raise DerivAdapterError("OAuth access token is empty")
+        self.auth_token = access_token
+        if not self.account_id:
+            await self.discover_account_id()
+
+    async def discover_account_id(self) -> str:
+        if not self.auth_token:
+            raise DerivAdapterError("OAuth access token is required for account discovery")
+        headers = {"Authorization": f"Bearer {self.auth_token}"}
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.get(
+                f"{self.rest_base}/trading/v1/options/accounts",
+                headers=headers,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        accounts = payload.get("data", [])
+        if isinstance(accounts, dict):
+            accounts = accounts.get("accounts") or accounts.get("data") or []
+        if not isinstance(accounts, list):
+            raise DerivAdapterError("Deriv accounts response has an unexpected shape")
+        preferred = [
+            a for a in accounts
+            if isinstance(a, dict)
+            and str(a.get("account_type", "")).lower() == self.account_mode
+        ]
+        for account in preferred + [a for a in accounts if a not in preferred]:
+            account_id = account.get("account_id") or account.get("id")
+            if account_id:
+                self.account_id = str(account_id)
+                return self.account_id
+        raise DerivAdapterError(
+            f"No {self.account_mode} Deriv options account was returned"
+        )
+
     async def connect_account(self) -> None:
+        if not self.auth_token:
+            raise DerivAdapterError("Deriv OAuth authentication is not established")
+        if not self.account_id:
+            await self.discover_account_id()
         ws_url = await self._request_account_ws_url()
         if self._demo_ws is not None:
             await self._demo_ws.close()
