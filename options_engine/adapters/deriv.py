@@ -17,6 +17,8 @@ from typing import Any, AsyncIterator
 import httpx
 import websockets
 
+from options_engine.execution import ExecutionAdapter
+
 
 REST_BASE = "https://api.derivws.com"
 PUBLIC_WS = "wss://api.derivws.com/trading/v1/options/ws/public"
