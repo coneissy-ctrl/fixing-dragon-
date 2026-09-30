@@ -26,6 +26,7 @@ DEMO_WS_MARKER = "/trading/v1/options/ws/demo"
 REAL_WS_MARKER = "/trading/v1/options/ws/real"
 DERIV_MCP_URL = "https://mcp-api.deriv.com/mcp"
 FIXED_STAKES = {60: Decimal("0.5"), 300: Decimal("2")}
+DEFAULT_MAX_STAKES = {60: Decimal(os.getenv("DERIV_MAX_STAKE_1M", "5")), 300: Decimal(os.getenv("DERIV_MAX_STAKE_5M", "10"))}
 
 
 class DerivAdapterError(RuntimeError):
@@ -352,10 +353,15 @@ class DerivOptionsDemo(ExecutionAdapter):
             raise ValueError("stake must be positive")
         if duration_seconds not in FIXED_STAKES:
             raise ValueError("duration_seconds must be 60 or 300")
-        expected_stake = FIXED_STAKES[duration_seconds]
-        if stake != expected_stake:
+        minimum_stake = FIXED_STAKES[duration_seconds]
+        maximum_stake = DEFAULT_MAX_STAKES[duration_seconds]
+        if stake < minimum_stake:
             raise ValueError(
-                f"fixed stake violation: {duration_seconds}s requires {expected_stake}, got {stake}"
+                f"stake below configured minimum: {duration_seconds}s requires at least {minimum_stake}, got {stake}"
+            )
+        if stake > maximum_stake:
+            raise ValueError(
+                f"stake above configured maximum: {duration_seconds}s allows at most {maximum_stake}, got {stake}"
             )
         req_id = self._next_req_id()
         response = await self._send(
