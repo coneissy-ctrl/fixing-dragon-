@@ -31,11 +31,19 @@ class LiveMonitor:
 
     async def run(self) -> None:
         self.state.status = "CONNECTING"
+        print("DERIV_CONNECT market_data", flush=True)
         await self.adapter.connect_market_data()
         # Authenticate to the selected account for read-only verification.
         # submit() remains separately gated when real trading is disabled.
+        print(
+            f"DERIV_CONNECT account mode={self.adapter.account_mode} "
+            f"live_execution_enabled={self.adapter.live_trading_enabled}",
+            flush=True,
+        )
         await self.adapter.connect_account()
+        print("DERIV_CONNECT account_connected", flush=True)
         symbols = await self.adapter.active_symbols()
+        print(f"DERIV_SYMBOLS received={len(symbols)}", flush=True)
         available = {str(x.get("underlying_symbol") or x.get("symbol")) for x in symbols if x.get("underlying_symbol") or x.get("symbol")}
         candidates = [self.symbol, "1HZ100V", "1HZ10V", "1HZ25V", "R_100", "R_75", "R_50", "R_25", "R_10"]
         selected = None
@@ -49,7 +57,11 @@ class LiveMonitor:
             except DerivAdapterError:
                 continue
         if selected is None:
-            raise RuntimeError("No supported tick symbol found in Deriv active_symbols")
+            raise RuntimeError(
+                "No supported tick symbol found in Deriv active_symbols "
+                f"(requested={self.symbol}, received={len(available)})"
+            )
+        print(f"DERIV_SYMBOL selected={selected}", flush=True)
         self.symbol = selected
         self.state.symbol = self.symbol
         self.state.status = (
@@ -102,6 +114,10 @@ async def main() -> None:
                 monitor.state.status = "DATA_ERROR"
                 monitor.state.updated_at = time.time()
                 monitor.state.last_signals[0] = {"error": str(exc)}
+                print(
+                    f"DERIV_MONITOR_ERROR type={type(exc).__name__} error={exc}",
+                    flush=True,
+                )
                 await monitor.close()
                 await asyncio.sleep(5)
     finally:
