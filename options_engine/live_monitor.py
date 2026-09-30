@@ -146,9 +146,8 @@ class LiveMonitor:
         await self.adapter.connect_account()
         self._sync_account_state()
         self.oauth_return_url = return_to
-        self.state.status = "AUTHENTICATED_READ_ONLY"
+        self.state.status = "LIVE_ACCOUNT_CONNECTED" if self.adapter.connected else "AUTHENTICATED_READ_ONLY"
         self.state.updated_at = time.time()
-        self.oauth_return_url = return_to
         print(
             f"DERIV_OAUTH authenticated account_id_present={bool(self.adapter.account_id)} "
             f"mode={self.adapter.account_mode} live_execution_enabled={self.adapter.live_trading_enabled} "
