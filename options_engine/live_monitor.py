@@ -88,7 +88,12 @@ class LiveMonitor:
 
 async def main() -> None:
     monitor = LiveMonitor()
-    dashboard_task = asyncio.create_task(serve_dashboard(monitor.state))
+    dashboard_server = await serve_dashboard(monitor.state)
+    print(
+        f"DASHBOARD_LISTENING host={os.getenv('DASHBOARD_HOST', '0.0.0.0')} "
+        f"port={os.getenv('PORT', '10000')}",
+        flush=True,
+    )
     try:
         while True:
             try:
@@ -100,7 +105,8 @@ async def main() -> None:
                 await monitor.close()
                 await asyncio.sleep(5)
     finally:
-        dashboard_task.cancel()
+        dashboard_server.close()
+        await dashboard_server.wait_closed()
         await monitor.close()
 
 
