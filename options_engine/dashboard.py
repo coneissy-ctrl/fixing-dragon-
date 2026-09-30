@@ -66,6 +66,14 @@ async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, st
             "\r\n"
         ).encode()
 
+        writer.write(head + body)
+        await writer.drain()
+    except Exception:
+        pass
+    finally:
+        writer.close()
+        await writer.wait_closed()
+
 
 async def serve_dashboard(state: DashboardState) -> asyncio.AbstractServer:
     host = os.getenv("DASHBOARD_HOST", "0.0.0.0")
