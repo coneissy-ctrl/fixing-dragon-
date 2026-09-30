@@ -130,8 +130,9 @@ class LiveMonitor:
         self.symbol = selected
         self.state.symbol = self.symbol
         self.state.status = (
-            "LIVE_ACCOUNT_CONNECTED" if self.adapter.account_mode == "real"
-            else "DEMO_ACCOUNT_CONNECTED"
+            "LIVE_ACCOUNT_CONNECTED"
+            if self.adapter.auth_token and self.adapter.account_id
+            else "LIVE_DATA"
         )
         self.state.connected_at = time.time()
         async for tick in self.adapter.ticks(self.symbol):
