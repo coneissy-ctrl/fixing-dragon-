@@ -39,7 +39,7 @@ class LiveMonitor:
             "DERIV_REDIRECT_URI",
             "https://dragon-options-demo-dashboard.onrender.com/oauth/deriv/callback",
         )
-        self.oauth_states: dict[str, str] = {}
+        self.oauth_states: dict[str, tuple[str, float]] = {}
 
     def oauth_login_url(self) -> str:
         if not self.oauth_client_id:
@@ -49,12 +49,14 @@ class LiveMonitor:
         challenge = base64.urlsafe_b64encode(
             hashlib.sha256(verifier.encode()).digest()
         ).rstrip(b"=").decode()
-        self.oauth_states[state] = verifier
+        now = time.time()
+        self.oauth_states = {k: v for k, v in self.oauth_states.items() if now - v[1] < 600}
+        self.oauth_states[state] = (verifier, now)
         params = {
             "response_type": "code",
             "client_id": self.oauth_client_id,
             "redirect_uri": self.oauth_redirect_uri,
-            "scope": "trade",
+            "scope": os.getenv("DERIV_OAUTH_SCOPE", "trade"),
             "state": state,
             "code_challenge": challenge,
             "code_challenge_method": "S256",
@@ -62,9 +64,12 @@ class LiveMonitor:
         return "https://auth.deriv.com/oauth2/auth?" + urlencode(params)
 
     async def oauth_callback(self, code: str, state: str) -> None:
-        verifier = self.oauth_states.pop(state, None)
-        if not verifier:
+        entry = self.oauth_states.pop(state, None)
+        if not entry:
             raise DerivAdapterError("OAuth state mismatch or expired")
+        verifier, created_at = entry
+        if time.time() - created_at >= 600:
+            raise DerivAdapterError("OAuth state expired")
         if not self.oauth_client_id:
             raise DerivAdapterError("DERIV_CLIENT_ID is not configured")
         async with httpx.AsyncClient(timeout=self.adapter.timeout) as client:
@@ -91,6 +96,7 @@ class LiveMonitor:
             flush=True,
         )
         self.state.status = "AUTHENTICATED_READ_ONLY"
+        self.state.updated_at = time.time()
 
     async def run(self) -> None:
         self.state.status = "CONNECTING"
