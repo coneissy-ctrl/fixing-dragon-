@@ -21,6 +21,7 @@ import websockets
 REST_BASE = "https://api.derivws.com"
 PUBLIC_WS = "wss://api.derivws.com/trading/v1/options/ws/public"
 DEMO_WS_MARKER = "/trading/v1/options/ws/demo"
+FIXED_STAKES = {60: Decimal("0.5"), 300: Decimal("2")}
 
 
 class DerivAdapterError(RuntimeError):
@@ -219,8 +220,13 @@ class DerivOptionsDemo(ExecutionAdapter):
             raise ValueError("direction must be CALL or PUT")
         if stake <= 0:
             raise ValueError("stake must be positive")
-        if duration_seconds not in {60, 300}:
+        if duration_seconds not in FIXED_STAKES:
             raise ValueError("duration_seconds must be 60 or 300")
+        expected_stake = FIXED_STAKES[duration_seconds]
+        if stake != expected_stake:
+            raise ValueError(
+                f"fixed stake violation: {duration_seconds}s requires {expected_stake}, got {stake}"
+            )
         req_id = self._next_req_id()
         response = await self._send(
             self._demo_ws,
