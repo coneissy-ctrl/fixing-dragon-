@@ -17,9 +17,10 @@ class DerivAdapterTests(unittest.TestCase):
                 "wss://api.derivws.com/trading/v1/options/ws/real?otp=test"
             )
 
-    def test_real_url_requires_explicit_live_enable(self):
-        with self.assertRaises(DerivLiveExecutionBlocked):
-            DerivOptionsDemo(account_mode="real", live_trading_enabled=False)
+    def test_real_account_can_connect_read_only_before_live_enable(self):
+        adapter = DerivOptionsDemo(account_mode="real", live_trading_enabled=False)
+        self.assertEqual("real", adapter.account_mode)
+        self.assertFalse(adapter.live_trading_enabled)
 
     def test_account_url_matches_selected_mode(self):
         adapter = DerivOptionsDemo(account_mode="demo")
