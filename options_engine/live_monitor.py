@@ -44,6 +44,10 @@ class LiveMonitor:
         self.oauth_expires_at: str | None = None
         self.oauth_return_url: str | None = None
         self.balance_task: asyncio.Task | None = None
+        self.execution_lock = asyncio.Lock()
+        self.last_execution_at = 0.0
+        self.min_balance_buffer = Decimal(os.getenv("DERIV_MIN_BALANCE_BUFFER", "0"))
+        self.auto_execute = os.getenv("DERIV_AUTO_EXECUTE", "true").lower() == "true"
 
     def _sync_account_state(self) -> None:
         self.state.account_id = self.adapter.account_id
@@ -99,6 +103,36 @@ class LiveMonitor:
             "code_challenge_method": "S256",
         }
         return "https://auth.deriv.com/oauth2/auth?" + urlencode(params)
+
+    async def _execute_signal(self, signal: Any) -> None:
+        if not self.auto_execute:
+            return
+        if self.adapter.account_mode != "real" or not self.adapter.live_trading_enabled:
+            return
+        if self.state.status != "LIVE_ACCOUNT_CONNECTED" or not self.adapter.connected:
+            return
+        async with self.execution_lock:
+            now = time.time()
+            min_interval = float(os.getenv("DERIV_MIN_EXECUTION_INTERVAL", "60"))
+            if now - self.last_execution_at < min_interval:
+                return
+            try:
+                balance = await self.adapter.balance()
+                if balance <= signal.stake + self.min_balance_buffer:
+                    raise DerivAdapterError("insufficient balance for configured stake")
+                order = await self.adapter.submit(
+                    signal.symbol,
+                    signal.direction,
+                    signal.stake,
+                    duration_seconds=signal.expiry_seconds,
+                )
+                self.last_execution_at = now
+                self.state.last_signals[signal.timeframe_minutes]["execution"] = order
+                print(f"DERIV_AUTO_EXECUTED contract_id={order.get('contract_id')} symbol={signal.symbol} direction={signal.direction} stake={signal.stake} expiry={signal.expiry_seconds}s", flush=True)
+                await self._refresh_balance()
+            except Exception as exc:
+                self.state.last_signals[signal.timeframe_minutes]["execution_error"] = f"{type(exc).__name__}: {exc}"
+                print(f"DERIV_AUTO_EXECUTION_ERROR type={type(exc).__name__} error={exc}", flush=True)
 
     async def _refresh_balance(self) -> None:
         try:
@@ -303,6 +337,7 @@ class LiveMonitor:
                         "candle_timestamp": signal.candle_timestamp,
                         "reason": signal.reason,
                     }
+                    await self._execute_signal(signal)
             self.state.updated_at = time.time()
 
     async def close(self) -> None:
