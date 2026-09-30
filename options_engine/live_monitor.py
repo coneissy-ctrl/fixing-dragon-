@@ -21,7 +21,7 @@ from .dashboard import DashboardState, serve_dashboard
 
 class LiveMonitor:
     def __init__(self, symbol: str | None = None):
-        self.symbol = symbol or os.getenv("DERIV_SYMBOL", "R_100")
+        self.symbol = symbol or os.getenv("DERIV_SYMBOL", "1HZ100V")
         self.adapter = DerivOptionsDemo(timeout=float(os.getenv("DERIV_WS_TIMEOUT", "12")))
         self.state = DashboardState(symbol=self.symbol)
         self.aggregators = {1: CandleAggregator(1), 5: CandleAggregator(5)}
@@ -33,10 +33,22 @@ class LiveMonitor:
         self.state.status = "CONNECTING"
         await self.adapter.connect_market_data()
         symbols = await self.adapter.active_symbols()
-        available = {str(x.get("symbol")) for x in symbols}
-        if self.symbol not in available:
-            self.symbol = next(iter(available))
-            self.state.symbol = self.symbol
+        available = {str(x.get("symbol")) for x in symbols if x.get("symbol")}
+        candidates = [self.symbol, "1HZ100V", "1HZ10V", "1HZ25V", "R_100", "R_75", "R_50", "R_25", "R_10"]
+        selected = None
+        for candidate in candidates:
+            if candidate not in available:
+                continue
+            try:
+                await self.adapter.contracts_for(candidate)
+                selected = candidate
+                break
+            except DerivAdapterError:
+                continue
+        if selected is None:
+            raise RuntimeError("No supported tick symbol found in Deriv active_symbols")
+        self.symbol = selected
+        self.state.symbol = self.symbol
         self.state.status = "LIVE_DATA"
         self.state.connected_at = time.time()
         async for tick in self.adapter.ticks(self.symbol):
