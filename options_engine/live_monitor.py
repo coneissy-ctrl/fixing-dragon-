@@ -124,10 +124,19 @@ class LiveMonitor:
         print("DERIV_CONNECT market_data", flush=True)
         await self.adapter.connect_market_data()
 
-        if self.adapter.auth_token or self.adapter.account_id:
+        should_auto_connect = (
+            self.adapter.auth_method == "pat"
+            or self.adapter.oauth_authenticated
+        )
+        print(
+            f"DERIV_AUTH_MODE method={self.adapter.auth_method} "
+            f"auto_connect={should_auto_connect} bearer_only={self.adapter.auth_method == 'oauth'}",
+            flush=True,
+        )
+        if should_auto_connect:
             try:
                 if not self.adapter.auth_token:
-                    raise DerivAdapterError("Account ID is configured but DERIV_AUTH_TOKEN is missing")
+                    raise DerivAdapterError("Authenticated account token is missing")
                 await self.adapter.connect_account()
                 self._sync_account_state()
                 self.state.status = "LIVE_ACCOUNT_CONNECTED"
