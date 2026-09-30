@@ -26,4 +26,13 @@ jobs:
         run: python -m options_engine.deriv_live_smoke
       - name: Assert live mode remains locked
         run: |
-          python -c "from options_engine.config import Settings;           import sys;           try: Settings(mode='live').validate()           except ValueError: print('LIVE_MODE_LOCKED')           else: sys.exit('LIVE MODE UNEXPECTEDLY ENABLED')"
+          python - <<'PY'
+          from options_engine.config import Settings
+          import sys
+          try:
+              Settings(mode="live").validate()
+          except ValueError:
+              print("LIVE_MODE_LOCKED")
+          else:
+              sys.exit("LIVE MODE UNEXPECTEDLY ENABLED")
+          PY
