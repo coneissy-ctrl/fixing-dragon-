@@ -471,10 +471,25 @@ class DerivOptionsDemo(ExecutionAdapter):
         return response.get("proposal_open_contract", {})
 
     async def balance(self) -> Decimal:
-        if self._account_ws is None:
-            raise DerivAdapterError("authenticated Deriv WebSocket is not connected")
-        req_id = self._next_req_id()
-        response = await self._send(
-            self._account_ws, {"balance": 1, "req_id": req_id}
-        )
-        return _decimal(response.get("balance", {}).get("balance"), "balance.balance")
+        # Balance reads are safe to retry. If Deriv closes the account socket,
+        # obtain a fresh OTP URL and reconnect before retrying the read once.
+        last_error: Exception | None = None
+        for attempt in range(2):
+            try:
+                if self._account_ws is None or not self.connected:
+                    await self.connect_account()
+                req_id = self._next_req_id()
+                response = await self._send(
+                    self._account_ws, {"balance": 1, "req_id": req_id}
+                )
+                return _decimal(response.get("balance", {}).get("balance"), "balance.balance")
+            except (DerivAdapterError, ConnectionClosed) as exc:
+                last_error = exc
+                if attempt == 0:
+                    try:
+                        await self.connect_account()
+                    except Exception as reconnect_exc:
+                        last_error = reconnect_exc
+                    continue
+                break
+        raise DerivAdapterError(f"Deriv balance unavailable after reconnect: {last_error}")
