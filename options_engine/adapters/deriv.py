@@ -1,8 +1,8 @@
 """Deriv live-market-data + demo-execution adapter.
 
-Market data uses Deriv's unauthenticated Options WebSocket. Demo execution uses
-the authenticated Options demo WebSocket URL returned by the OTP REST endpoint.
-No real-account URL or real-account execution path is accepted here.
+Market data uses Deriv's unauthenticated Options WebSocket. Account authentication
+uses the authenticated Options WebSocket URL returned by the OTP REST endpoint.
+Real-account authentication is permitted read-only; order execution remains explicitly gated.
 """
 
 from __future__ import annotations
@@ -66,7 +66,11 @@ def _decimal(value: Any, field: str) -> Decimal:
 
 
 class DerivOptionsDemo(ExecutionAdapter):
-    """Read live Deriv ticks and execute only against a demo account."""
+    """Read live Deriv ticks and authenticate against demo or real accounts.
+
+    Real-account order execution remains explicitly gated by
+    DERIV_LIVE_TRADING_ENABLED and the engine live-mode lock.
+    """
 
     def __init__(
         self,
@@ -104,9 +108,14 @@ class DerivOptionsDemo(ExecutionAdapter):
         return self._req_id
 
     def _require_credentials(self) -> None:
-        if not self.auth_token or not self.account_id:
+        missing = []
+        if not self.auth_token:
+            missing.append("DERIV_AUTH_TOKEN")
+        if not self.account_id:
+            missing.append("DERIV_ACCOUNT_ID")
+        if missing:
             raise DerivAdapterError(
-                "DERIV_AUTH_TOKEN and DERIV_ACCOUNT_ID are required for demo execution"
+                f"Missing Deriv credentials for {self.account_mode} account: {', '.join(missing)}"
             )
 
     @staticmethod
@@ -124,7 +133,7 @@ class DerivOptionsDemo(ExecutionAdapter):
                 f"Deriv {self.account_mode} account URL validation failed"
             )
 
-    async def _request_demo_ws_url(self) -> str:
+    async def _request_account_ws_url(self) -> str:
         self._require_credentials()
         headers = {"Authorization": f"Bearer {self.auth_token}"}
         if self.app_id:
@@ -145,7 +154,7 @@ class DerivOptionsDemo(ExecutionAdapter):
         await self.connect_account()
 
     async def connect_account(self) -> None:
-        ws_url = await self._request_demo_ws_url()
+        ws_url = await self._request_account_ws_url()
         if self._demo_ws is not None:
             await self._demo_ws.close()
         self._demo_ws = await websockets.connect(
@@ -245,7 +254,7 @@ class DerivOptionsDemo(ExecutionAdapter):
         currency: str = "USD",
     ) -> DerivProposal:
         if self._demo_ws is None:
-            raise DerivAdapterError("demo WebSocket is not connected")
+            raise DerivAdapterError("account WebSocket is not connected")
         direction = direction.upper()
         if direction not in {"CALL", "PUT"}:
             raise ValueError("direction must be CALL or PUT")
