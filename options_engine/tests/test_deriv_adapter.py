@@ -17,6 +17,16 @@ class DerivAdapterTests(unittest.TestCase):
                 "wss://api.derivws.com/trading/v1/options/ws/real?otp=test"
             )
 
+    def test_real_url_requires_explicit_live_enable(self):
+        with self.assertRaises(DerivLiveExecutionBlocked):
+            DerivOptionsDemo(account_mode="real", live_trading_enabled=False)
+
+    def test_account_url_matches_selected_mode(self):
+        adapter = DerivOptionsDemo(account_mode="demo")
+        adapter._assert_account_url("wss://api.derivws.com/trading/v1/options/ws/demo?otp=test")
+        with self.assertRaises(DerivLiveExecutionBlocked):
+            adapter._assert_account_url("wss://api.derivws.com/trading/v1/options/ws/real?otp=test")
+
     def test_credentials_are_required_for_demo(self):
         adapter = DerivOptionsDemo(auth_token=None, account_id=None)
         with self.assertRaisesRegex(Exception, "DERIV_AUTH_TOKEN"):
