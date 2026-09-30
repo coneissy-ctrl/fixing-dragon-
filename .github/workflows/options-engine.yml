@@ -18,6 +18,8 @@ jobs:
         run: python -m compileall -q options_engine
       - name: Unit tests
         run: python -m unittest discover -s options_engine/tests -v
+      - name: Paper binary lifecycle smoke run
+        run: python -m options_engine.paper_runner
       - name: Assert live mode remains locked
         run: python -c "from options_engine.config import Settings; Settings(mode='live').validate()"
         continue-on-error: true
