@@ -241,8 +241,12 @@ class LiveMonitor:
         print("DERIV_CONNECT market_data", flush=True)
         await self.adapter.connect_market_data()
 
-        should_auto_connect = (
-            self.adapter.auth_method == "pat"
+        # A persisted DERIV_AUTH_TOKEN can restore the account session after
+        # a Render restart. OAuth callback authentication remains process-local
+        # unless a token is supplied through the service environment.
+        should_auto_connect = bool(
+            self.adapter.auth_token
+            or self.adapter.auth_method == "pat"
             or self.adapter.oauth_authenticated
         )
         print(
