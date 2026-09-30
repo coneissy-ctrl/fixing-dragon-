@@ -30,8 +30,11 @@ class EngineTests(unittest.TestCase):
         self.assertIsNone(strategy.generate('R_100',data,Decimal('1')))
     def test_martingale_rejected(self):
         with self.assertRaises(ValueError): Settings(martingale=True).validate()
-    def test_timeframes(self):
-        s=Settings(); s.validate(); self.assertEqual(s.timeframes,(1,5))
+    def test_timeframes_and_stakes(self):
+        s=Settings(); s.validate(); self.assertEqual(s.timeframes,(1,5)); self.assertEqual(s.stake_for(1),Decimal('0.5')); self.assertEqual(s.stake_for(5),Decimal('2'))
+
+    def test_stakes_do_not_martingale(self):
+        s=Settings(); s.validate(); self.assertEqual(s.stake_for(1),Decimal('0.5')); self.assertEqual(s.stake_for(5),Decimal('2'))
     def test_live_locked(self):
         with self.assertRaises(ValueError): Settings(mode='live').validate()
 
