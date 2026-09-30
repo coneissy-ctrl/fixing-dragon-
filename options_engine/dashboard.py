@@ -4,8 +4,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from dataclasses
-from urllib.parse import parse_qs, urlsplit import dataclass, field
+from dataclasses import dataclass, field
+from urllib.parse import parse_qs, urlsplit
 from typing import Any
 
 
