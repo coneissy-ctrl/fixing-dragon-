@@ -32,6 +32,9 @@ class LiveMonitor:
     async def run(self) -> None:
         self.state.status = "CONNECTING"
         await self.adapter.connect_market_data()
+        # Authenticate to the selected account for read-only verification.
+        # submit() remains separately gated when real trading is disabled.
+        await self.adapter.connect_account()
         symbols = await self.adapter.active_symbols()
         available = {str(x.get("underlying_symbol") or x.get("symbol")) for x in symbols if x.get("underlying_symbol") or x.get("symbol")}
         candidates = [self.symbol, "1HZ100V", "1HZ10V", "1HZ25V", "R_100", "R_75", "R_50", "R_25", "R_10"]
@@ -49,7 +52,10 @@ class LiveMonitor:
             raise RuntimeError("No supported tick symbol found in Deriv active_symbols")
         self.symbol = selected
         self.state.symbol = self.symbol
-        self.state.status = "LIVE_DATA"
+        self.state.status = (
+            "LIVE_ACCOUNT_CONNECTED" if self.adapter.account_mode == "real"
+            else "DEMO_ACCOUNT_CONNECTED"
+        )
         self.state.connected_at = time.time()
         async for tick in self.adapter.ticks(self.symbol):
             self.state.tick_count += 1
