@@ -123,6 +123,20 @@ async def _handle(
                     try:
                         await oauth_callback(code, state_token)
                         state.auth_error = None
+                        owner = getattr(oauth_callback, "__self__", None)
+                        destination = getattr(owner, "oauth_return_url", None)
+                        if destination:
+                            sep = "&" if "?" in destination else "?"
+                            location = destination + sep + "status=success"
+                            head = (
+                                "HTTP/1.1 302 Found\r\n"
+                                f"Location: {location}\r\n"
+                                "Cache-Control: no-store\r\n"
+                                "Content-Length: 0\r\n\r\n"
+                            ).encode()
+                            writer.write(head)
+                            await writer.drain()
+                            return
                         body = b"Deriv OAuth authentication successful. Return to the dashboard."
                     except Exception as exc:
                         state.auth_error = f"{type(exc).__name__}: {exc}"
