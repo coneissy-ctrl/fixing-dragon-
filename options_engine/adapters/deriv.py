@@ -16,6 +16,7 @@ from typing import Any, AsyncIterator
 
 import httpx
 import websockets
+from websockets.exceptions import ConnectionClosed
 
 from options_engine.execution import ExecutionAdapter
 
@@ -126,6 +127,7 @@ class DerivOptionsDemo(ExecutionAdapter):
         self.timeout = timeout
         self._market_ws: Any | None = None
         self._account_ws: Any | None = None
+        self._account_ws_lock = asyncio.Lock()
         self._req_id = 0
         self.connected = False
         self.enabled = True
@@ -246,15 +248,26 @@ class DerivOptionsDemo(ExecutionAdapter):
     async def connect_account(self) -> None:
         if not self.auth_token:
             raise DerivAdapterError("Deriv authentication is not established")
-        if not self.account_id:
-            await self.discover_account_id()
-        ws_url = await self._request_account_ws_url()
-        if self._account_ws is not None:
-            await self._account_ws.close()
-        self._account_ws = await websockets.connect(
-            ws_url, ping_interval=20, ping_timeout=20
-        )
-        self.connected = True
+        async with self._account_ws_lock:
+            if not self.account_id:
+                await self.discover_account_id()
+            ws_url = await self._request_account_ws_url()
+            old_ws = self._account_ws
+            self._account_ws = None
+            self.connected = False
+            if old_ws is not None:
+                try:
+                    await old_ws.close()
+                except Exception:
+                    pass
+            self._account_ws = await websockets.connect(
+                ws_url,
+                ping_interval=15,
+                ping_timeout=15,
+                close_timeout=5,
+                max_queue=64,
+            )
+            self.connected = True
 
     async def connect(self) -> None:
         await self.connect_market_data()
@@ -280,18 +293,26 @@ class DerivOptionsDemo(ExecutionAdapter):
     ) -> dict[str, Any]:
         if ws is None:
             raise DerivAdapterError("Deriv WebSocket is not connected")
-        await ws.send(json.dumps(payload))
-        deadline = timeout or self.timeout
-        while True:
-            raw = await asyncio.wait_for(ws.recv(), timeout=deadline)
-            message = json.loads(raw)
-            if message.get("error"):
-                error = message["error"]
-                raise DerivAdapterError(
-                    f"Deriv API error {error.get('code')}: {error.get('message')}"
-                )
-            if message.get("req_id") == payload.get("req_id"):
-                return message
+        try:
+            await ws.send(json.dumps(payload))
+            deadline = timeout or self.timeout
+            while True:
+                raw = await asyncio.wait_for(ws.recv(), timeout=deadline)
+                message = json.loads(raw)
+                if message.get("error"):
+                    error = message["error"]
+                    raise DerivAdapterError(
+                        f"Deriv API error {error.get('code')}: {error.get('message')}"
+                    )
+                if message.get("req_id") == payload.get("req_id"):
+                    return message
+        except ConnectionClosed as exc:
+            if ws is self._account_ws:
+                self._account_ws = None
+                self.connected = False
+            raise DerivAdapterError(
+                f"Deriv account WebSocket closed code={exc.code} reason={exc.reason or 'none'}"
+            ) from exc
 
     async def active_symbols(self) -> list[dict[str, Any]]:
         req_id = self._next_req_id()
