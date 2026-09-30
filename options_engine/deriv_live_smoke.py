@@ -19,7 +19,7 @@ async def run(symbol: str | None = None) -> int:
         if not symbols:
             raise RuntimeError("Deriv returned no active symbols")
         requested = symbol or os.getenv("DERIV_SYMBOL", "R_100")
-        available = {str(x.get("symbol")) for x in symbols}
+        available = {str(x.get("underlying_symbol") or x.get("symbol")) for x in symbols if x.get("underlying_symbol") or x.get("symbol")}
         target = requested if requested in available else next(iter(available))
         tick = await anext(adapter.ticks(target))
         if tick.quote <= 0 or tick.epoch <= 0:
