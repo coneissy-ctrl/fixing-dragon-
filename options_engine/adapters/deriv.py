@@ -61,7 +61,7 @@ def _decimal(value: Any, field: str) -> Decimal:
         raise DerivAdapterError(f"invalid numeric field: {field}") from exc
 
 
-class DerivOptionsDemo:
+class DerivOptionsDemo(ExecutionAdapter):
     """Read live Deriv ticks and execute only against a demo account."""
 
     def __init__(
@@ -277,6 +277,35 @@ class DerivOptionsDemo:
             buy_price=_decimal(buy.get("buy_price", price), "buy.buy_price"),
             raw=buy,
         )
+
+    async def submit(
+        self,
+        symbol: str,
+        direction: str,
+        stake: Decimal,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        duration_seconds = int(kwargs.get("duration_seconds", 60))
+        proposal = await self.proposal(
+            symbol=symbol,
+            direction=direction,
+            stake=stake,
+            duration_seconds=duration_seconds,
+            currency=str(kwargs.get("currency", "USD")),
+        )
+        contract = await self.buy(proposal.proposal_id, proposal.ask_price)
+        return {
+            "id": contract.contract_id,
+            "contract_id": contract.contract_id,
+            "symbol": symbol,
+            "direction": direction.upper(),
+            "stake": str(stake),
+            "buy_price": str(contract.buy_price),
+            "duration_seconds": duration_seconds,
+            "status": "OPEN",
+            "paper": False,
+            "demo": True,
+        }
 
     async def contract_status(self, contract_id: str) -> dict[str, Any]:
         if self._demo_ws is None:
