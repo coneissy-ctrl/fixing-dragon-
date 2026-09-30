@@ -492,25 +492,36 @@ class DerivOptionsDemo(ExecutionAdapter):
         return response.get("proposal_open_contract", {})
 
     async def balance(self) -> Decimal:
-        # Balance reads are safe to retry. If Deriv closes the account socket,
-        # obtain a fresh OTP URL and reconnect before retrying the read once.
+        # Deriv can close an authenticated account socket while the public feed
+        # remains healthy. Always obtain a fresh OTP and reconnect before retrying.
+        # Keep the request one-shot here; the monitor polls every few seconds.
         last_error: Exception | None = None
-        for attempt in range(2):
+        for attempt in range(3):
             try:
                 if self._account_ws is None or not self.connected:
                     await self.connect_account()
                 req_id = self._next_req_id()
                 response = await self._send(
-                    self._account_ws, {"balance": 1, "req_id": req_id}
+                    self._account_ws,
+                    {"balance": 1, "req_id": req_id},
+                    timeout=self.timeout,
                 )
-                return _decimal(response.get("balance", {}).get("balance"), "balance.balance")
+                balance_payload = response.get("balance") or {}
+                value = balance_payload.get("balance")
+                if value is None:
+                    raise DerivAdapterError("Deriv balance response did not contain balance.balance")
+                return _decimal(value, "balance.balance")
             except (DerivAdapterError, ConnectionClosed) as exc:
                 last_error = exc
-                if attempt == 0:
+                self.connected = False
+                if self._account_ws is not None:
                     try:
-                        await self.connect_account()
-                    except Exception as reconnect_exc:
-                        last_error = reconnect_exc
+                        await self._account_ws.close()
+                    except Exception:
+                        pass
+                    self._account_ws = None
+                if attempt < 2:
+                    await asyncio.sleep(0.25 * (attempt + 1))
                     continue
                 break
         raise DerivAdapterError(f"Deriv balance unavailable after reconnect: {last_error}")
