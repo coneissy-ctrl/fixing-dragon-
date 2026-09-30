@@ -1,0 +1,82 @@
+"""Continuous Deriv live-data monitor with a read-only dashboard.
+
+This process observes live ticks, builds completed 1m/5m candles and evaluates
+the existing strategy. It never buys a contract. Demo execution remains a
+separate explicitly gated action.
+"""
+from __future__ import annotations
+
+import asyncio
+import os
+import time
+from dataclasses import asdict
+from decimal import Decimal
+from typing import Any
+
+from .adapters.deriv import DerivOptionsDemo, DerivAdapterError
+from .candles import CandleAggregator
+from .strategy import BinaryStrategy
+from .dashboard import DashboardState, serve_dashboard
+
+
+class LiveMonitor:
+    def __init__(self, symbol: str | None = None):
+        self.symbol = symbol or os.getenv("DERIV_SYMBOL", "R_100")
+        self.adapter = DerivOptionsDemo(timeout=float(os.getenv("DERIV_WS_TIMEOUT", "12")))
+        self.state = DashboardState(symbol=self.symbol)
+        self.aggregators = {1: CandleAggregator(1), 5: CandleAggregator(5)}
+        self.strategies = {1: BinaryStrategy(1), 5: BinaryStrategy(5)}
+        self.candles: dict[int, list[Any]] = {1: [], 5: []}
+        self.stakes = {1: Decimal("0.5"), 5: Decimal("2")}
+
+    async def run(self) -> None:
+        self.state.status = "CONNECTING"
+        await self.adapter.connect_market_data()
+        symbols = await self.adapter.active_symbols()
+        available = {str(x.get("symbol")) for x in symbols}
+        if self.symbol not in available:
+            self.symbol = next(iter(available))
+            self.state.symbol = self.symbol
+        self.state.status = "LIVE_DATA"
+        self.state.connected_at = time.time()
+        async for tick in self.adapter.ticks(self.symbol):
+            self.state.tick_count += 1
+            self.state.last_tick = asdict(tick)
+            self.state.last_tick_at = time.time()
+            self.state.quote = str(tick.quote)
+            for tf, agg in self.aggregators.items():
+                completed = agg.update(tick.epoch, float(tick.quote))
+                if completed is None:
+                    continue
+                self.candles[tf].append(completed)
+                self.candles[tf] = self.candles[tf][-80:]
+                self.state.candles[tf] += 1
+                signal = self.strategies[tf].generate(self.symbol, self.candles[tf], self.stakes[tf])
+                if signal:
+                    self.state.signals[tf] += 1
+                    self.state.last_signals[tf] = {
+                        "direction": signal.direction,
+                        "stake": str(signal.stake),
+                        "confidence": str(signal.confidence),
+                        "expiry_seconds": signal.expiry_seconds,
+                        "candle_timestamp": signal.candle_timestamp,
+                        "reason": signal.reason,
+                    }
+            self.state.updated_at = time.time()
+
+    async def close(self) -> None:
+        await self.adapter.close()
+
+
+async def main() -> None:
+    monitor = LiveMonitor()
+    dashboard_task = asyncio.create_task(serve_dashboard(monitor.state))
+    try:
+        await monitor.run()
+    finally:
+        dashboard_task.cancel()
+        await monitor.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
