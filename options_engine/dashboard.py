@@ -146,10 +146,10 @@ async def _handle(
         target = parts[1]
         path = urlsplit(target).path
         query = parse_qs(urlsplit(target).query)
-        while await reader.readline() not in (b"
-", b"
-", b""):
-            pass
+        while True:
+            header_line = await reader.readline()
+            if header_line in (b"\r\n", b"\n", b""):
+                break
 
         if path == "/account/balance":
             payload = state.payload()
