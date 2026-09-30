@@ -43,6 +43,7 @@ class LiveMonitor:
         self.oauth_scopes: list[str] = []
         self.oauth_expires_at: str | None = None
         self.oauth_return_url: str | None = None
+        self.balance_task: asyncio.Task | None = None
 
     def _sync_account_state(self) -> None:
         self.state.account_id = self.adapter.account_id
@@ -99,6 +100,25 @@ class LiveMonitor:
         }
         return "https://auth.deriv.com/oauth2/auth?" + urlencode(params)
 
+    async def _refresh_balance(self) -> None:
+        try:
+            value = await self.adapter.balance()
+            self.state.balance = str(value)
+            self.state.balance_updated_at = time.time()
+            self.state.balance_error = None
+        except Exception as exc:
+            self.state.balance_error = f"{type(exc).__name__}: {exc}"
+            print(f"DERIV_BALANCE_ERROR type={type(exc).__name__} error={exc}", flush=True)
+
+    async def _balance_loop(self) -> None:
+        while True:
+            await self._refresh_balance()
+            await asyncio.sleep(float(os.getenv("DERIV_BALANCE_POLL_SECONDS", "5")))
+
+    def _start_balance_loop(self) -> None:
+        if self.balance_task is None or self.balance_task.done():
+            self.balance_task = asyncio.create_task(self._balance_loop())
+
     async def oauth_callback(self, code: str, state: str) -> None:
         entry = self.oauth_states.pop(state, None)
         if not entry:
@@ -148,6 +168,7 @@ class LiveMonitor:
         self.oauth_return_url = return_to
         self.state.status = "LIVE_ACCOUNT_CONNECTED" if self.adapter.connected else "AUTHENTICATED_READ_ONLY"
         self.state.updated_at = time.time()
+        self._start_balance_loop()
         print(
             f"DERIV_OAUTH authenticated account_id_present={bool(self.adapter.account_id)} "
             f"mode={self.adapter.account_mode} live_execution_enabled={self.adapter.live_trading_enabled} "
@@ -202,6 +223,7 @@ class LiveMonitor:
                 await self.adapter.connect_account()
                 self._sync_account_state()
                 self.state.status = "LIVE_ACCOUNT_CONNECTED"
+                self._start_balance_loop()
                 print(
                     f"DERIV_CONNECT account_connected mode={self.adapter.account_mode} "
                     f"account_id={self.adapter.account_id} live_execution_enabled={self.adapter.live_trading_enabled}",
@@ -284,6 +306,13 @@ class LiveMonitor:
             self.state.updated_at = time.time()
 
     async def close(self) -> None:
+        if self.balance_task is not None:
+            self.balance_task.cancel()
+            try:
+                await self.balance_task
+            except asyncio.CancelledError:
+                pass
+            self.balance_task = None
         await self.adapter.close()
 
 
