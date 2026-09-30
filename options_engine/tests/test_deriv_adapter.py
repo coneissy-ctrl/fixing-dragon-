@@ -28,6 +28,10 @@ class DerivAdapterTests(unittest.TestCase):
             self._validate_proposal_input("BUY", Decimal("0.5"), 60)
         with self.assertRaises(ValueError):
             self._validate_proposal_input("CALL", Decimal("0.5"), 120)
+        with self.assertRaises(ValueError):
+            self._validate_proposal_input("CALL", Decimal("1"), 60)
+        with self.assertRaises(ValueError):
+            self._validate_proposal_input("PUT", Decimal("0.5"), 300)
 
     @staticmethod
     def _validate_proposal_input(direction, stake, duration):
