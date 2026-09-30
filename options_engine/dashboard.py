@@ -49,7 +49,7 @@ async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, st
     try:
         request = await asyncio.wait_for(reader.readline(), 5)
         path = request.decode("utf-8", "ignore").split(" ")[1].split("?")[0]
-        while await reader.readline() not in (b"\\r\\n", b"\\n", b""):
+        while await reader.readline() not in (b"\r\n", b"\n", b""):
             pass
         if path == "/health":
             body = json.dumps(state.payload(), separators=(",", ":")).encode()
