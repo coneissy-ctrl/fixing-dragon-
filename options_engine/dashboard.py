@@ -56,7 +56,7 @@ class DashboardState:
             "execution": execution,
             "real_money": self.account_mode == "real" and self.live_execution_enabled,
             "authenticated": authenticated,
-            "account_id": self.account_id,
+            "account_id": (f"...{self.account_id[-4:]}" if self.account_id else None),
             "account_mode": self.account_mode,
             "live_execution_enabled": self.live_execution_enabled,
             "auth_error": self.auth_error,
