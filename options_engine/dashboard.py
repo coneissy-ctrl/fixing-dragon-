@@ -74,6 +74,7 @@ async def _handle(
     state: DashboardState,
     oauth_login,
     oauth_callback,
+    oauth_status,
 ) -> None:
     try:
         request = await asyncio.wait_for(reader.readline(), 5)
@@ -89,8 +90,9 @@ async def _handle(
         if path == "/health":
             body = json.dumps(state.payload(), separators=(",", ":")).encode()
             content_type = "application/json"
-        elif path == "/auth/deriv/login":
-            location = oauth_login()
+        elif path in {"/auth/deriv/login", "/oauth/deriv/start"}:
+            return_to = query.get("return_to", [None])[0]
+            location = oauth_login(return_to)
             head = (
                 "HTTP/1.1 302 Found\r\n"
                 f"Location: {location}\r\n"
@@ -100,6 +102,9 @@ async def _handle(
             writer.write(head)
             await writer.drain()
             return
+        elif path == "/oauth/deriv/status":
+            body = json.dumps(oauth_status(), separators=(",", ":")).encode()
+            content_type = "application/json"
         elif path == "/oauth/deriv/callback":
             error = query.get("error", [None])[0]
             if error:
@@ -147,11 +152,12 @@ async def serve_dashboard(
     state: DashboardState,
     oauth_login,
     oauth_callback,
+    oauth_status,
 ) -> asyncio.AbstractServer:
     host = os.getenv("DASHBOARD_HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "10000"))
     return await asyncio.start_server(
-        lambda r, w: _handle(r, w, state, oauth_login, oauth_callback),
+        lambda r, w: _handle(r, w, state, oauth_login, oauth_callback, oauth_status),
         host,
         port,
         reuse_address=True,
