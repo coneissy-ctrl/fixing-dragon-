@@ -21,5 +21,4 @@ jobs:
       - name: Paper binary lifecycle smoke run
         run: python -m options_engine.paper_runner
       - name: Assert live mode remains locked
-        run: python -c "from options_engine.config import Settings; Settings(mode='live').validate()"
-        continue-on-error: true
+        run: python -c "from options_engine.config import Settings; Settings(mode='live').validate(); raise SystemExit('LIVE MODE UNEXPECTEDLY ENABLED')"
