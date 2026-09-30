@@ -1,9 +1,4 @@
-"""Continuous Deriv live-data monitor with a read-only dashboard.
-
-This process observes live ticks, builds completed 1m/5m candles and evaluates
-the existing strategy. It never buys a contract. Demo execution remains a
-separate explicitly gated action.
-"""
+"""Continuous Deriv live-data monitor with OAuth account connection and dashboard."""
 from __future__ import annotations
 
 import asyncio
@@ -19,7 +14,7 @@ from dataclasses import asdict
 from decimal import Decimal
 from typing import Any
 
-from .adapters.deriv import DerivOptionsDemo, DerivAdapterError
+from .adapters.deriv import DerivOptionsDemo, DerivAdapterError, DERIV_MCP_URL
 from .candles import CandleAggregator
 from .strategy import BinaryStrategy
 from .dashboard import DashboardState, serve_dashboard
@@ -29,7 +24,11 @@ class LiveMonitor:
     def __init__(self, symbol: str | None = None):
         self.symbol = symbol or os.getenv("DERIV_SYMBOL", "1HZ100V")
         self.adapter = DerivOptionsDemo(timeout=float(os.getenv("DERIV_WS_TIMEOUT", "12")))
-        self.state = DashboardState(symbol=self.symbol)
+        self.state = DashboardState(
+            symbol=self.symbol,
+            account_mode=self.adapter.account_mode,
+            live_execution_enabled=self.adapter.live_trading_enabled,
+        )
         self.aggregators = {1: CandleAggregator(1), 5: CandleAggregator(5)}
         self.strategies = {1: BinaryStrategy(1), 5: BinaryStrategy(5)}
         self.candles: dict[int, list[Any]] = {1: [], 5: []}
@@ -41,6 +40,11 @@ class LiveMonitor:
         )
         self.oauth_states: dict[str, tuple[str, float]] = {}
 
+    def _sync_account_state(self) -> None:
+        self.state.account_id = self.adapter.account_id
+        self.state.account_mode = self.adapter.account_mode
+        self.state.live_execution_enabled = self.adapter.live_trading_enabled
+
     def oauth_login_url(self) -> str:
         if not self.oauth_client_id:
             raise DerivAdapterError("DERIV_CLIENT_ID is not configured")
@@ -50,7 +54,9 @@ class LiveMonitor:
             hashlib.sha256(verifier.encode()).digest()
         ).rstrip(b"=").decode()
         now = time.time()
-        self.oauth_states = {k: v for k, v in self.oauth_states.items() if now - v[1] < 600}
+        self.oauth_states = {
+            k: v for k, v in self.oauth_states.items() if now - v[1] < 600
+        }
         self.oauth_states[state] = (verifier, now)
         params = {
             "response_type": "code",
@@ -72,6 +78,7 @@ class LiveMonitor:
             raise DerivAdapterError("OAuth state expired")
         if not self.oauth_client_id:
             raise DerivAdapterError("DERIV_CLIENT_ID is not configured")
+
         async with httpx.AsyncClient(timeout=self.adapter.timeout) as client:
             response = await client.post(
                 "https://auth.deriv.com/oauth2/token",
@@ -83,39 +90,74 @@ class LiveMonitor:
                     "redirect_uri": self.oauth_redirect_uri,
                 },
             )
-            response.raise_for_status()
-            payload = response.json()
+        if response.is_error:
+            try:
+                payload = response.json()
+                error = payload.get("error") or payload.get("error_description")
+            except Exception:
+                error = response.text[:300]
+            raise DerivAdapterError(
+                f"Deriv OAuth token exchange HTTP {response.status_code}: {error}"
+            )
+
+        payload = response.json()
         token = payload.get("access_token")
         if not token:
             raise DerivAdapterError("Deriv OAuth token response did not contain access_token")
+
         await self.adapter.set_oauth_token(token)
         await self.adapter.connect_account()
-        print(
-            f"DERIV_OAUTH authenticated account_id_present={bool(self.adapter.account_id)} "
-            f"live_execution_enabled={self.adapter.live_trading_enabled}",
-            flush=True,
-        )
+        self._sync_account_state()
         self.state.status = "AUTHENTICATED_READ_ONLY"
         self.state.updated_at = time.time()
+        print(
+            f"DERIV_OAUTH authenticated account_id_present={bool(self.adapter.account_id)} "
+            f"mode={self.adapter.account_mode} live_execution_enabled={self.adapter.live_trading_enabled} "
+            f"mcp_context={self.adapter.mcp_url}",
+            flush=True,
+        )
 
     async def run(self) -> None:
         self.state.status = "CONNECTING"
+        self.state.auth_error = None
+        print(f"DERIV_API_CONTEXT mcp={self.adapter.mcp_url} rest={self.adapter.rest_base}", flush=True)
         print("DERIV_CONNECT market_data", flush=True)
         await self.adapter.connect_market_data()
-        if self.adapter.auth_token and self.adapter.account_id:
-            print(
-                f"DERIV_CONNECT account mode={self.adapter.account_mode} "
-                f"live_execution_enabled={self.adapter.live_trading_enabled}",
-                flush=True,
-            )
-            await self.adapter.connect_account()
-            print("DERIV_CONNECT account_connected", flush=True)
+
+        if self.adapter.auth_token or self.adapter.account_id:
+            try:
+                if not self.adapter.auth_token:
+                    raise DerivAdapterError("Account ID is configured but DERIV_AUTH_TOKEN is missing")
+                await self.adapter.connect_account()
+                self._sync_account_state()
+                self.state.status = "LIVE_ACCOUNT_CONNECTED"
+                print(
+                    f"DERIV_CONNECT account_connected mode={self.adapter.account_mode} "
+                    f"account_id={self.adapter.account_id} live_execution_enabled={self.adapter.live_trading_enabled}",
+                    flush=True,
+                )
+            except Exception as exc:
+                self.state.auth_error = f"{type(exc).__name__}: {exc}"
+                self._sync_account_state()
+                print(
+                    f"DERIV_ACCOUNT_CONNECT_ERROR type={type(exc).__name__} error={exc}",
+                    flush=True,
+                )
+                self.state.status = "LIVE_DATA"
         else:
             print("DERIV_CONNECT account waiting_for_oauth", flush=True)
+
         symbols = await self.adapter.active_symbols()
         print(f"DERIV_SYMBOLS received={len(symbols)}", flush=True)
-        available = {str(x.get("underlying_symbol") or x.get("symbol")) for x in symbols if x.get("underlying_symbol") or x.get("symbol")}
-        candidates = [self.symbol, "1HZ100V", "1HZ10V", "1HZ25V", "R_100", "R_75", "R_50", "R_25", "R_10"]
+        available = {
+            str(x.get("underlying_symbol") or x.get("symbol"))
+            for x in symbols
+            if x.get("underlying_symbol") or x.get("symbol")
+        }
+        candidates = [
+            self.symbol, "1HZ100V", "1HZ10V", "1HZ25V",
+            "R_100", "R_75", "R_50", "R_25", "R_10",
+        ]
         selected = None
         for candidate in candidates:
             if candidate not in available:
@@ -131,16 +173,15 @@ class LiveMonitor:
                 "No supported tick symbol found in Deriv active_symbols "
                 f"(requested={self.symbol}, received={len(available)})"
             )
+
         print(f"DERIV_SYMBOL selected={selected}", flush=True)
         print("DERIV_TICKS subscription_start", flush=True)
         self.symbol = selected
         self.state.symbol = self.symbol
-        self.state.status = (
-            "LIVE_ACCOUNT_CONNECTED"
-            if self.adapter.auth_token and self.adapter.account_id
-            else "LIVE_DATA"
-        )
+        if self.state.status == "CONNECTING":
+            self.state.status = "LIVE_DATA"
         self.state.connected_at = time.time()
+
         async for tick in self.adapter.ticks(self.symbol):
             if self.state.tick_count == 0:
                 print(f"DERIV_TICKS first_tick symbol={self.symbol}", flush=True)
@@ -148,6 +189,7 @@ class LiveMonitor:
             self.state.last_tick = asdict(tick)
             self.state.last_tick_at = time.time()
             self.state.quote = str(tick.quote)
+
             for tf, agg in self.aggregators.items():
                 completed = agg.update(tick.epoch, float(tick.quote))
                 if completed is None:
@@ -155,7 +197,9 @@ class LiveMonitor:
                 self.candles[tf].append(completed)
                 self.candles[tf] = self.candles[tf][-80:]
                 self.state.candles[tf] += 1
-                signal = self.strategies[tf].generate(self.symbol, self.candles[tf], self.stakes[tf])
+                signal = self.strategies[tf].generate(
+                    self.symbol, self.candles[tf], self.stakes[tf]
+                )
                 if signal:
                     self.state.signals[tf] += 1
                     self.state.last_signals[tf] = {
