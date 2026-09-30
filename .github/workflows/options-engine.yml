@@ -22,5 +22,7 @@ jobs:
         run: python -m unittest discover -s options_engine/tests -v
       - name: Paper binary lifecycle smoke run
         run: python -m options_engine.paper_runner
+      - name: Deriv public live-data smoke test
+        run: python -m options_engine.deriv_live_smoke
       - name: Assert live mode remains locked
         run: python -c "from options_engine.config import Settings; Settings(mode='live').validate(); raise SystemExit('LIVE MODE UNEXPECTEDLY ENABLED')"
