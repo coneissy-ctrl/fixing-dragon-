@@ -18,6 +18,7 @@ from .adapters.deriv import DerivOptionsDemo, DerivAdapterError, DERIV_MCP_URL
 from .candles import CandleAggregator
 from .strategy import BinaryStrategy
 from .dashboard import DashboardState, serve_dashboard
+from .compounding import CompoundingEngine
 
 
 class LiveMonitor:
@@ -33,6 +34,26 @@ class LiveMonitor:
         self.strategies = {1: BinaryStrategy(1), 5: BinaryStrategy(5)}
         self.candles: dict[int, list[Any]] = {1: [], 5: []}
         self.stakes = {1: Decimal("0.5"), 5: Decimal("2")}
+        self.compounding = {
+            1: CompoundingEngine(
+                base_stake=self.stakes[1],
+                enabled=os.getenv("DERIV_COMPOUNDING_ENABLED", "true").lower() == "true",
+                trigger_wins=int(os.getenv("DERIV_COMPOUNDING_TRIGGER_WINS", "5")),
+                frequency_trades=int(os.getenv("DERIV_COMPOUNDING_FREQUENCY", "2")),
+                profit_allocation_pct=Decimal(os.getenv("DERIV_COMPOUNDING_ALLOCATION", "0.50")),
+                max_stake=Decimal(os.getenv("DERIV_MAX_STAKE_1M", "5")),
+            ),
+            5: CompoundingEngine(
+                base_stake=self.stakes[5],
+                enabled=os.getenv("DERIV_COMPOUNDING_ENABLED", "true").lower() == "true",
+                trigger_wins=int(os.getenv("DERIV_COMPOUNDING_TRIGGER_WINS", "5")),
+                frequency_trades=int(os.getenv("DERIV_COMPOUNDING_FREQUENCY", "2")),
+                profit_allocation_pct=Decimal(os.getenv("DERIV_COMPOUNDING_ALLOCATION", "0.50")),
+                max_stake=Decimal(os.getenv("DERIV_MAX_STAKE_5M", "10")),
+            ),
+        }
+        self.execution_tasks: set[asyncio.Task] = set()
+        self.state.compounding = {tf: asdict(engine.snapshot()) for tf, engine in self.compounding.items()}
         self.oauth_client_id = os.getenv("DERIV_CLIENT_ID")
         self.oauth_redirect_uri = os.getenv(
             "DERIV_REDIRECT_URI",
@@ -120,19 +141,52 @@ class LiveMonitor:
                 balance = await self.adapter.balance()
                 if balance <= signal.stake + self.min_balance_buffer:
                     raise DerivAdapterError("insufficient balance for configured stake")
+                tf = int(signal.timeframe_minutes)
+                stake = self.compounding[tf].next_stake()
                 order = await self.adapter.submit(
                     signal.symbol,
                     signal.direction,
-                    signal.stake,
+                    stake,
                     duration_seconds=signal.expiry_seconds,
                 )
                 self.last_execution_at = now
-                self.state.last_signals[signal.timeframe_minutes]["execution"] = order
-                print(f"DERIV_AUTO_EXECUTED contract_id={order.get('contract_id')} symbol={signal.symbol} direction={signal.direction} stake={signal.stake} expiry={signal.expiry_seconds}s", flush=True)
+                self.state.last_signals[tf]["stake"] = str(stake)
+                self.state.last_signals[tf]["execution"] = order
+                self.state.compounding[tf] = asdict(self.compounding[tf].snapshot())
+                print(f"DERIV_AUTO_EXECUTED contract_id={order.get('contract_id')} symbol={signal.symbol} direction={signal.direction} stake={stake} expiry={signal.expiry_seconds}s", flush=True)
+                task = asyncio.create_task(self._track_contract(tf, order.get("contract_id")))
+                self.execution_tasks.add(task)
+                task.add_done_callback(self.execution_tasks.discard)
                 await self._refresh_balance()
             except Exception as exc:
                 self.state.last_signals[signal.timeframe_minutes]["execution_error"] = f"{type(exc).__name__}: {exc}"
                 print(f"DERIV_AUTO_EXECUTION_ERROR type={type(exc).__name__} error={exc}", flush=True)
+
+    async def _track_contract(self, timeframe: int, contract_id: str | None) -> None:
+        if not contract_id:
+            return
+        for _ in range(240):
+            try:
+                result = await self.adapter.contract_status(contract_id)
+                status = str(result.get("status") or "").lower()
+                is_sold = bool(result.get("is_sold"))
+                is_expired = bool(result.get("is_expired"))
+                if status in {"won", "lost"} or is_sold or is_expired:
+                    profit = Decimal(str(result.get("profit") or "0"))
+                    won = status == "won" or profit > 0
+                    next_stake = self.compounding[timeframe].record_result(won=won, profit=profit)
+                    self.state.compounding[timeframe] = asdict(self.compounding[timeframe].snapshot())
+                    signal_state = self.state.last_signals.get(timeframe, {})
+                    signal_state["result"] = "WIN" if won else "LOSS"
+                    signal_state["profit"] = str(profit)
+                    signal_state["contract_id"] = str(contract_id)
+                    signal_state["next_stake"] = str(next_stake)
+                    self.state.last_signals[timeframe] = signal_state
+                    print(f"DERIV_CONTRACT_RESULT contract_id={contract_id} result={'WIN' if won else 'LOSS'} profit={profit} next_stake={next_stake}", flush=True)
+                    return
+            except Exception as exc:
+                print(f"DERIV_CONTRACT_STATUS_ERROR contract_id={contract_id} type={type(exc).__name__} error={exc}", flush=True)
+            await asyncio.sleep(2)
 
     async def _refresh_balance(self) -> None:
         try:
@@ -325,7 +379,7 @@ class LiveMonitor:
                 self.candles[tf] = self.candles[tf][-80:]
                 self.state.candles[tf] += 1
                 signal = self.strategies[tf].generate(
-                    self.symbol, self.candles[tf], self.stakes[tf]
+                    self.symbol, self.candles[tf], self.compounding[tf].next_stake()
                 )
                 if signal:
                     self.state.signals[tf] += 1
@@ -341,6 +395,9 @@ class LiveMonitor:
             self.state.updated_at = time.time()
 
     async def close(self) -> None:
+        for task in list(self.execution_tasks):
+            task.cancel()
+        self.execution_tasks.clear()
         if self.balance_task is not None:
             self.balance_task.cancel()
             try:
