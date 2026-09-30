@@ -1,18 +1,19 @@
-# Options Engine — Demo/Paper First
+# Options Engine — Binary 1m / 5m
 
-This module is isolated from Dragon's DEX arbitrage engine and provides a common strategy/risk/execution foundation for Binance Options and Deriv Options.
+Paper-first binary-options engine with isolated broker adapters.
 
-## Safety state
-- Default mode: `paper`
-- `OPTIONS_DRY_RUN=true`
-- Live execution is hard-locked in this initial build.
-- No withdrawal functionality.
-- No secrets committed to Git.
+## Modes
+- **1m:** completed 1-minute candle -> 60-second CALL/PUT signal.
+- **5m:** completed 5-minute candle -> 300-second CALL/PUT signal.
+- Both use the same configured fixed stake.
+- One signal maximum per completed candle/timeframe.
+- 1m and 5m strategy state is independent.
 
-## Verification
-```bash
-python -m unittest discover -s options_engine/tests -v
-```
+## Signal filters
+EMA5/EMA12 trend alignment, candle direction, ATR(14) volatility/body filter, price position versus EMA5, and a minimum confidence threshold. Weak/choppy candles are skipped.
 
-## Promotion gate
-Real-money execution requires separate live adapters and explicit promotion only after unit, paper, demo, reconciliation, reconnect/stale-data and risk-limit verification. Deriv's current Options API uses REST for account/OTP setup and an authenticated demo WebSocket for trading; public WebSocket is available for unauthenticated market data.
+## Risk
+Martingale is permanently disabled. A loss never increases the next stake. Daily loss, consecutive-loss, maximum stake, and open-position limits remain enforced.
+
+## Safety
+Default mode is paper and live execution remains hard-locked. Demo adapters must pass connectivity, order lifecycle, stale-data, reconnect, reconciliation, and risk tests before any live adapter is considered.
