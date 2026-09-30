@@ -23,6 +23,7 @@ from options_engine.execution import ExecutionAdapter
 REST_BASE = "https://api.derivws.com"
 PUBLIC_WS = "wss://api.derivws.com/trading/v1/options/ws/public"
 DEMO_WS_MARKER = "/trading/v1/options/ws/demo"
+REAL_WS_MARKER = "/trading/v1/options/ws/real"
 FIXED_STAKES = {60: Decimal("0.5"), 300: Decimal("2")}
 
 
@@ -73,6 +74,8 @@ class DerivOptionsDemo(ExecutionAdapter):
         auth_token: str | None = None,
         app_id: str | None = None,
         account_id: str | None = None,
+        account_mode: str | None = None,
+        live_trading_enabled: bool | None = None,
         rest_base: str = REST_BASE,
         public_ws: str = PUBLIC_WS,
         timeout: float = 10.0,
@@ -80,6 +83,15 @@ class DerivOptionsDemo(ExecutionAdapter):
         self.auth_token = auth_token or os.getenv("DERIV_AUTH_TOKEN")
         self.app_id = app_id or os.getenv("DERIV_APP_ID")
         self.account_id = account_id or os.getenv("DERIV_ACCOUNT_ID")
+        self.account_mode = (account_mode or os.getenv("DERIV_ACCOUNT_MODE", "demo")).lower()
+        enabled_env = os.getenv("DERIV_LIVE_TRADING_ENABLED", "false").lower() == "true"
+        self.live_trading_enabled = enabled_env if live_trading_enabled is None else live_trading_enabled
+        if self.account_mode not in {"demo", "real"}:
+            raise ValueError("DERIV_ACCOUNT_MODE must be demo or real")
+        if self.account_mode == "real" and not self.live_trading_enabled:
+            raise DerivLiveExecutionBlocked(
+                "Real Deriv execution is locked: set DERIV_LIVE_TRADING_ENABLED=true explicitly"
+            )
         self.rest_base = rest_base.rstrip("/")
         self.public_ws = public_ws
         self.timeout = timeout
@@ -106,6 +118,14 @@ class DerivOptionsDemo(ExecutionAdapter):
                 "Only Deriv's demo Options WebSocket is permitted by this adapter"
             )
 
+    def _assert_account_url(self, url: str) -> None:
+        expected = REAL_WS_MARKER if self.account_mode == "real" else DEMO_WS_MARKER
+        forbidden = DEMO_WS_MARKER if self.account_mode == "real" else REAL_WS_MARKER
+        if expected not in url or forbidden in url:
+            raise DerivLiveExecutionBlocked(
+                f"Deriv {self.account_mode} account URL validation failed"
+            )
+
     async def _request_demo_ws_url(self) -> str:
         self._require_credentials()
         headers = {"Authorization": f"Bearer {self.auth_token}"}
@@ -119,12 +139,21 @@ class DerivOptionsDemo(ExecutionAdapter):
         ws_url = payload.get("data", {}).get("url")
         if not isinstance(ws_url, str) or not ws_url:
             raise DerivAdapterError("Deriv OTP response did not contain data.url")
-        self._assert_demo_url(ws_url)
+        self._assert_account_url(ws_url)
         return ws_url
 
     async def connect(self) -> None:
         await self.connect_market_data()
-        await self.connect_demo()
+        await self.connect_account()
+
+    async def connect_account(self) -> None:
+        ws_url = await self._request_demo_ws_url()
+        if self._demo_ws is not None:
+            await self._demo_ws.close()
+        self._demo_ws = await websockets.connect(
+            ws_url, ping_interval=20, ping_timeout=20
+        )
+        self.connected = True
 
     async def connect_market_data(self) -> None:
         if self._market_ws is None:
@@ -133,6 +162,8 @@ class DerivOptionsDemo(ExecutionAdapter):
             )
 
     async def connect_demo(self) -> None:
+        if self.account_mode != "demo":
+            raise DerivLiveExecutionBlocked("connect_demo requires DERIV_ACCOUNT_MODE=demo")
         ws_url = await self._request_demo_ws_url()
         if self._demo_ws is not None:
             await self._demo_ws.close()
@@ -312,7 +343,8 @@ class DerivOptionsDemo(ExecutionAdapter):
             "duration_seconds": duration_seconds,
             "status": "OPEN",
             "paper": False,
-            "demo": True,
+            "demo": self.account_mode == "demo",
+            "real": self.account_mode == "real",
         }
 
     async def contract_status(self, contract_id: str) -> dict[str, Any]:
