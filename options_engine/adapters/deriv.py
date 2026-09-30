@@ -104,9 +104,11 @@ class DerivOptionsDemo(ExecutionAdapter):
         public_ws: str = PUBLIC_WS,
         timeout: float = 10.0,
     ):
-        self.auth_token = auth_token or os.getenv("DERIV_AUTH_TOKEN")
-        self.app_id = app_id or os.getenv("DERIV_APP_ID")
         self.auth_method = os.getenv("DERIV_AUTH_METHOD", "oauth").lower()
+        self.auth_token = auth_token if auth_token is not None else (
+            os.getenv("DERIV_AUTH_TOKEN") if self.auth_method == "pat" else None
+        )
+        self.app_id = app_id or os.getenv("DERIV_APP_ID")
         if self.auth_method not in {"oauth", "pat"}:
             raise ValueError("DERIV_AUTH_METHOD must be oauth or pat")
         self.account_id = account_id or os.getenv("DERIV_ACCOUNT_ID")
@@ -127,6 +129,7 @@ class DerivOptionsDemo(ExecutionAdapter):
         self.connected = False
         self.enabled = True
         self.account_type: str | None = None
+        self.oauth_authenticated = False
 
     def _next_req_id(self) -> int:
         self._req_id += 1
@@ -182,7 +185,8 @@ class DerivOptionsDemo(ExecutionAdapter):
         if not access_token:
             raise DerivAdapterError("OAuth access token is empty")
         self.auth_token = access_token
-        self.account_id = self.account_id or None
+        self.account_id = None
+        self.oauth_authenticated = True
         await self.discover_account_id()
 
     async def discover_account_id(self) -> str:
