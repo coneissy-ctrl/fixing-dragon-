@@ -138,9 +138,14 @@ class LiveMonitor:
         self.oauth_scopes = [str(x) for x in (payload.get("scope") or os.getenv("DERIV_OAUTH_SCOPE", "trade").split())] if isinstance(payload.get("scope") or "", (list, str)) else [os.getenv("DERIV_OAUTH_SCOPE", "trade")]
         expires_in = payload.get("expires_in")
         self.oauth_expires_at = str(time.time() + float(expires_in)) if expires_in else None
+        scope_value = payload.get("scope")
+        self.oauth_scopes = scope_value.split() if isinstance(scope_value, str) else [os.getenv("DERIV_OAUTH_SCOPE", "trade")]
+        expires_in = payload.get("expires_in")
+        self.oauth_expires_at = str(time.time() + float(expires_in)) if expires_in else None
         await self.adapter.set_oauth_token(token)
         await self.adapter.connect_account()
         self._sync_account_state()
+        self.oauth_return_url = return_to
         self.state.status = "AUTHENTICATED_READ_ONLY"
         self.state.updated_at = time.time()
         self.oauth_return_url = return_to
@@ -150,6 +155,18 @@ class LiveMonitor:
             f"mcp_context={self.adapter.mcp_url}",
             flush=True,
         )
+
+    def oauth_status(self) -> dict[str, Any]:
+        authenticated = bool(self.adapter.oauth_authenticated and self.adapter.account_id)
+        return {
+            "connected": authenticated,
+            "loginid": self.adapter.account_id,
+            "account_type": self.adapter.account_type or self.adapter.account_mode,
+            "currency": None,
+            "scopes": self.oauth_scopes or [os.getenv("DERIV_OAUTH_SCOPE", "trade")],
+            "live_execution_enabled": bool(self.adapter.live_trading_enabled) if authenticated else False,
+            "expires_at": self.oauth_expires_at,
+        }
 
     def oauth_status(self) -> dict[str, Any]:
         authenticated = bool(self.adapter.oauth_authenticated and self.adapter.account_id)
