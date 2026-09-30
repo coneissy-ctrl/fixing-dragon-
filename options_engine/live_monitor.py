@@ -226,20 +226,24 @@ async def main() -> None:
         f"port={os.getenv('PORT', '10000')}",
         flush=True,
     )
+    retry_delay = 5.0
     try:
         while True:
             try:
                 await monitor.run()
+                retry_delay = 5.0
             except Exception as exc:
                 monitor.state.status = "DATA_ERROR"
                 monitor.state.updated_at = time.time()
                 monitor.state.last_signals[0] = {"error": str(exc)}
                 print(
-                    f"DERIV_MONITOR_ERROR type={type(exc).__name__} error={exc}",
+                    f"DERIV_MONITOR_ERROR type={type(exc).__name__} error={exc} "
+                    f"retry_in={retry_delay:.1f}s",
                     flush=True,
                 )
                 await monitor.close()
-                await asyncio.sleep(5)
+                await asyncio.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2.0, 120.0)
     finally:
         dashboard_server.close()
         await dashboard_server.wait_closed()
