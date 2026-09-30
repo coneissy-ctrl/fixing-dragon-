@@ -3,7 +3,7 @@
 from options_engine.execution import DemoOnlyAdapter, ExecutionAdapter, PaperAdapter
 from options_engine.adapters.deriv import (
     DerivAdapterError,
-    DerivDemoContract,
+    DerivContract,
     DerivLiveExecutionBlocked,
     DerivOptionsDemo,
     DerivProposal,
@@ -17,7 +17,7 @@ __all__ = [
     "DerivOptionsDemo",
     "DerivAdapterError",
     "DerivLiveExecutionBlocked",
-    "DerivDemoContract",
+    "DerivContract",
     "DerivProposal",
     "DerivTick",
 ]
