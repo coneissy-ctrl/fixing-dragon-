@@ -107,9 +107,9 @@ class DerivOptionsDemo(ExecutionAdapter):
         timeout: float = 10.0,
     ):
         self.auth_method = os.getenv("DERIV_AUTH_METHOD", "oauth").lower()
-        self.auth_token = auth_token if auth_token is not None else (
-            os.getenv("DERIV_AUTH_TOKEN") if self.auth_method == "pat" else None
-        )
+        # OAuth/PAT bearer tokens may be supplied by Render environment variables.
+        # This lets a configured token survive a Render process restart.
+        self.auth_token = auth_token if auth_token is not None else os.getenv("DERIV_AUTH_TOKEN")
         self.app_id = app_id or os.getenv("DERIV_APP_ID")
         if self.auth_method not in {"oauth", "pat"}:
             raise ValueError("DERIV_AUTH_METHOD must be oauth or pat")
