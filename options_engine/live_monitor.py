@@ -291,7 +291,10 @@ class LiveMonitor:
 async def main() -> None:
     monitor = LiveMonitor()
     dashboard_server = await serve_dashboard(
-        monitor.state, monitor.oauth_login_url, monitor.oauth_callback
+        monitor.state,
+        monitor.oauth_login_url,
+        monitor.oauth_callback,
+        monitor.oauth_status,
     )
     print(
         f"DASHBOARD_LISTENING host={os.getenv('DASHBOARD_HOST', '0.0.0.0')} "
