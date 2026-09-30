@@ -53,7 +53,7 @@ class LiveMonitor:
     def _validate_oauth_return_url(self, return_to: str | None) -> str:
         default = os.getenv(
             "DERIV_OAUTH_RETURN_URL",
-            "https://id-preview--7b53d67c-3f92-41ff-9675-72696f290d06.lovable.app/deriv/return",
+            "https://dragon-options-demo-dashboard.onrender.com/",
         )
         candidate = (return_to or default).strip()
         allowed = [
@@ -63,7 +63,7 @@ class LiveMonitor:
         ]
         if not allowed:
             allowed = [
-                "https://id-preview--7b53d67c-3f92-41ff-9675-72696f290d06.lovable.app",
+                "https://dragon-options-demo-dashboard.onrender.com",
             ]
         try:
             parsed = __import__("urllib.parse", fromlist=["urlparse"]).urlparse(candidate)
