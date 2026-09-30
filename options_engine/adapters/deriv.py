@@ -86,6 +86,9 @@ class DerivOptionsDemo(ExecutionAdapter):
     ):
         self.auth_token = auth_token or os.getenv("DERIV_AUTH_TOKEN")
         self.app_id = app_id or os.getenv("DERIV_APP_ID")
+        self.auth_method = os.getenv("DERIV_AUTH_METHOD", "oauth").lower()
+        if self.auth_method not in {"oauth", "pat"}:
+            raise ValueError("DERIV_AUTH_METHOD must be oauth or pat")
         self.account_id = account_id or os.getenv("DERIV_ACCOUNT_ID")
         self.account_mode = (account_mode or os.getenv("DERIV_ACCOUNT_MODE", "demo")).lower()
         enabled_env = os.getenv("DERIV_LIVE_TRADING_ENABLED", "false").lower() == "true"
@@ -133,11 +136,17 @@ class DerivOptionsDemo(ExecutionAdapter):
                 f"Deriv {self.account_mode} account URL validation failed"
             )
 
-    async def _request_account_ws_url(self) -> str:
+    def _auth_headers(self) -> dict[str, str]:
         self._require_credentials()
         headers = {"Authorization": f"Bearer {self.auth_token}"}
-        if self.app_id:
+        if self.auth_method == "pat":
+            if not self.app_id:
+                raise DerivAdapterError("DERIV_APP_ID is required when DERIV_AUTH_METHOD=pat")
             headers["Deriv-App-ID"] = self.app_id
+        return headers
+
+    async def _request_account_ws_url(self) -> str:
+        headers = self._auth_headers()
         url = f"{self.rest_base}/trading/v1/options/accounts/{self.account_id}/otp"
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(url, headers=headers)
@@ -163,7 +172,7 @@ class DerivOptionsDemo(ExecutionAdapter):
     async def discover_account_id(self) -> str:
         if not self.auth_token:
             raise DerivAdapterError("OAuth access token is required for account discovery")
-        headers = {"Authorization": f"Bearer {self.auth_token}"}
+        headers = self._auth_headers()
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(
                 f"{self.rest_base}/trading/v1/options/accounts",
@@ -208,6 +217,19 @@ class DerivOptionsDemo(ExecutionAdapter):
             self._market_ws = await websockets.connect(
                 self.public_ws, ping_interval=20, ping_timeout=20
             )
+
+    async def _request_demo_ws_url(self) -> str:
+        headers = self._auth_headers()
+        url = f"{self.rest_base}/trading/v1/options/accounts/{self.account_id}/otp"
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(url, headers=headers)
+            response.raise_for_status()
+            payload = response.json()
+        ws_url = payload.get("data", {}).get("url")
+        if not isinstance(ws_url, str) or not ws_url:
+            raise DerivAdapterError("Deriv OTP response did not contain data.url")
+        self._assert_demo_url(ws_url)
+        return ws_url
 
     async def connect_demo(self) -> None:
         if self.account_mode != "demo":
