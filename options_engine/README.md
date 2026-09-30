@@ -17,3 +17,4 @@ Martingale is permanently disabled. A loss never increases the next stake. Daily
 
 ## Safety
 Default mode is paper and live execution remains hard-locked. Demo adapters must pass connectivity, order lifecycle, stale-data, reconnect, reconciliation, and risk tests before any live adapter is considered.
+
