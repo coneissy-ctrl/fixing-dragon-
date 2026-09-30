@@ -88,10 +88,8 @@ class DerivOptionsDemo(ExecutionAdapter):
         self.live_trading_enabled = enabled_env if live_trading_enabled is None else live_trading_enabled
         if self.account_mode not in {"demo", "real"}:
             raise ValueError("DERIV_ACCOUNT_MODE must be demo or real")
-        if self.account_mode == "real" and not self.live_trading_enabled:
-            raise DerivLiveExecutionBlocked(
-                "Real Deriv execution is locked: set DERIV_LIVE_TRADING_ENABLED=true explicitly"
-            )
+        # Real-account authentication is allowed for read-only verification.
+        # Actual trading remains gated inside submit().
         self.rest_base = rest_base.rstrip("/")
         self.public_ws = public_ws
         self.timeout = timeout
@@ -324,6 +322,10 @@ class DerivOptionsDemo(ExecutionAdapter):
         stake: Decimal,
         **kwargs: Any,
     ) -> dict[str, Any]:
+        if self.account_mode == "real" and not self.live_trading_enabled:
+            raise DerivLiveExecutionBlocked(
+                "Real Deriv execution is locked: set DERIV_LIVE_TRADING_ENABLED=true explicitly"
+            )
         duration_seconds = int(kwargs.get("duration_seconds", 60))
         proposal = await self.proposal(
             symbol=symbol,
