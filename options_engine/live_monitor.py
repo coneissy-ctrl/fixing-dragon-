@@ -33,7 +33,7 @@ class LiveMonitor:
         self.state.status = "CONNECTING"
         await self.adapter.connect_market_data()
         symbols = await self.adapter.active_symbols()
-        available = {str(x.get("symbol")) for x in symbols if x.get("symbol")}
+        available = {str(x.get("underlying_symbol") or x.get("symbol")) for x in symbols if x.get("underlying_symbol") or x.get("symbol")}
         candidates = [self.symbol, "1HZ100V", "1HZ10V", "1HZ25V", "R_100", "R_75", "R_50", "R_25", "R_10"]
         selected = None
         for candidate in candidates:
