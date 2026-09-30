@@ -57,19 +57,22 @@ async def _handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, st
         else:
             body = HTML.encode()
             content_type = "text/html; charset=utf-8"
-        head = f"HTTP/1.1 200 OK\\r\\nContent-Type: {content_type}\\r\\nCache-Control: no-store\\r\\nContent-Length: {len(body)}\\r\\nConnection: close\\r\\n\\r\\n".encode()
-        writer.write(head + body)
-        await writer.drain()
-    except Exception:
-        pass
-    finally:
-        writer.close()
-        await writer.wait_closed()
+        head = (
+            f"HTTP/1.1 200 OK\r\n"
+            f"Content-Type: {content_type}\r\n"
+            "Cache-Control: no-store\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        ).encode()
 
 
-async def serve_dashboard(state: DashboardState) -> None:
+async def serve_dashboard(state: DashboardState) -> asyncio.AbstractServer:
     host = os.getenv("DASHBOARD_HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "10000"))
-    server = await asyncio.start_server(lambda r, w: _handle(r, w, state), host, port)
-    async with server:
-        await server.serve_forever()
+    return await asyncio.start_server(
+        lambda r, w: _handle(r, w, state),
+        host,
+        port,
+        reuse_address=True,
+    )
