@@ -72,7 +72,15 @@ async def main() -> None:
     monitor = LiveMonitor()
     dashboard_task = asyncio.create_task(serve_dashboard(monitor.state))
     try:
-        await monitor.run()
+        while True:
+            try:
+                await monitor.run()
+            except Exception as exc:
+                monitor.state.status = "DATA_ERROR"
+                monitor.state.updated_at = time.time()
+                monitor.state.last_signals[0] = {"error": str(exc)}
+                await monitor.close()
+                await asyncio.sleep(5)
     finally:
         dashboard_task.cancel()
         await monitor.close()
