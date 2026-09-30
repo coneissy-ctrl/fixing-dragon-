@@ -42,6 +42,9 @@ class DerivAdapterTests(unittest.TestCase):
             raise ValueError("stake must be positive")
         if duration not in {60, 300}:
             raise ValueError("duration_seconds must be 60 or 300")
+        expected = Decimal("0.5") if duration == 60 else Decimal("2")
+        if stake != expected:
+            raise ValueError("fixed stake violation")
 
 
 if __name__ == "__main__":
