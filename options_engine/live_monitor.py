@@ -38,14 +38,42 @@ class LiveMonitor:
             "DERIV_REDIRECT_URI",
             "https://dragon-options-demo-dashboard.onrender.com/oauth/deriv/callback",
         )
-        self.oauth_states: dict[str, tuple[str, float]] = {}
+        # state -> (PKCE verifier, created_at, validated return URL)
+        self.oauth_states: dict[str, tuple[str, float, str]] = {}
+        self.oauth_scopes: list[str] = []
+        self.oauth_expires_at: str | None = None
+        self.oauth_return_url: str | None = None
 
     def _sync_account_state(self) -> None:
         self.state.account_id = self.adapter.account_id
         self.state.account_mode = self.adapter.account_mode
         self.state.live_execution_enabled = self.adapter.live_trading_enabled
 
-    def oauth_login_url(self) -> str:
+    def _validate_oauth_return_url(self, return_to: str | None) -> str:
+        default = os.getenv(
+            "DERIV_OAUTH_RETURN_URL",
+            "https://id-preview--7b53d67c-3f92-41ff-9675-72696f290d06.lovable.app/deriv/return",
+        )
+        candidate = (return_to or default).strip()
+        allowed = [
+            x.strip().rstrip("/")
+            for x in os.getenv("DERIV_OAUTH_ALLOWED_RETURN_ORIGINS", "").split(",")
+            if x.strip()
+        ]
+        if not allowed:
+            allowed = [
+                "https://id-preview--7b53d67c-3f92-41ff-9675-72696f290d06.lovable.app",
+            ]
+        try:
+            parsed = __import__("urllib.parse", fromlist=["urlparse"]).urlparse(candidate)
+        except Exception as exc:
+            raise DerivAdapterError("Invalid OAuth return URL") from exc
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        if parsed.scheme != "https" or origin.rstrip("/") not in allowed:
+            raise DerivAdapterError("OAuth return URL is not allowlisted")
+        return candidate
+
+    def oauth_login_url(self, return_to: str | None = None) -> str:
         if not self.oauth_client_id:
             raise DerivAdapterError("DERIV_CLIENT_ID is not configured")
         verifier = secrets.token_urlsafe(64)
@@ -57,7 +85,9 @@ class LiveMonitor:
         self.oauth_states = {
             k: v for k, v in self.oauth_states.items() if now - v[1] < 600
         }
-        self.oauth_states[state] = (verifier, now)
+        validated_return = self._validate_oauth_return_url(return_to)
+        self.oauth_states[state] = (verifier, now, validated_return)
+        self.oauth_return_url = validated_return
         params = {
             "response_type": "code",
             "client_id": self.oauth_client_id,
@@ -73,7 +103,7 @@ class LiveMonitor:
         entry = self.oauth_states.pop(state, None)
         if not entry:
             raise DerivAdapterError("OAuth state mismatch or expired")
-        verifier, created_at = entry
+        verifier, created_at, return_to = entry
         if time.time() - created_at >= 600:
             raise DerivAdapterError("OAuth state expired")
         if not self.oauth_client_id:
@@ -105,17 +135,33 @@ class LiveMonitor:
         if not token:
             raise DerivAdapterError("Deriv OAuth token response did not contain access_token")
 
+        self.oauth_scopes = [str(x) for x in (payload.get("scope") or os.getenv("DERIV_OAUTH_SCOPE", "trade").split())] if isinstance(payload.get("scope") or "", (list, str)) else [os.getenv("DERIV_OAUTH_SCOPE", "trade")]
+        expires_in = payload.get("expires_in")
+        self.oauth_expires_at = str(time.time() + float(expires_in)) if expires_in else None
         await self.adapter.set_oauth_token(token)
         await self.adapter.connect_account()
         self._sync_account_state()
         self.state.status = "AUTHENTICATED_READ_ONLY"
         self.state.updated_at = time.time()
+        self.oauth_return_url = return_to
         print(
             f"DERIV_OAUTH authenticated account_id_present={bool(self.adapter.account_id)} "
             f"mode={self.adapter.account_mode} live_execution_enabled={self.adapter.live_trading_enabled} "
             f"mcp_context={self.adapter.mcp_url}",
             flush=True,
         )
+
+    def oauth_status(self) -> dict[str, Any]:
+        authenticated = bool(self.adapter.oauth_authenticated and self.adapter.account_id)
+        return {
+            "connected": authenticated,
+            "loginid": self.adapter.account_id,
+            "account_type": self.adapter.account_type or self.adapter.account_mode,
+            "currency": None,
+            "scopes": self.oauth_scopes or [os.getenv("DERIV_OAUTH_SCOPE", "trade")],
+            "live_execution_enabled": bool(self.adapter.live_trading_enabled) if authenticated else False,
+            "expires_at": self.oauth_expires_at,
+        }
 
     async def run(self) -> None:
         self.state.status = "CONNECTING"
