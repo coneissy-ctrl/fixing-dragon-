@@ -13,6 +13,8 @@ import base64
 import hashlib
 import secrets
 from urllib.parse import urlencode
+
+import httpx
 from dataclasses import asdict
 from decimal import Decimal
 from typing import Any
