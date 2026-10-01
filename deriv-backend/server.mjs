@@ -52,11 +52,17 @@ function randomState() {
   return crypto.randomBytes(32).toString("base64url");
 }
 
+function authToken() {
+  return session?.accessToken || (DERIV_PAT ? DERIV_PAT : "");
+}
+
 async function derivFetch(path, options = {}) {
-  if (!session?.accessToken) throw new Error("Deriv account is not connected");
+  const token = authToken();
+  if (!token) throw new Error("Deriv account is not connected");
   const headers = {
-    authorization: `Bearer ${session.accessToken}`,
+    authorization: `Bearer ${token}`,
     accept: "application/json",
+    ...(DERIV_PAT ? { "Deriv-App-ID": DERIV_APP_ID } : {}),
     ...(options.headers || {}),
   };
   return fetch("https://api.derivws.com" + path, { ...options, headers });
@@ -190,7 +196,7 @@ async function handle(req, res) {
 
   if (url.pathname === "/oauth/deriv/status" && req.method === "GET") {
     if (!authOK(req)) return json(res, 401, { error: "unauthorized" });
-    if (!session?.accessToken) return json(res, 200, { connected: false });
+    if (!authToken()) return json(res, 200, { connected: false });
     try {
       const account = await connectedAccount();
       const wsUrl = await getOtpUrl(account.accountId);
@@ -210,7 +216,7 @@ async function handle(req, res) {
   }
 
   if (!authOK(req)) return json(res, 401, { error: "unauthorized" });
-  if (!session?.accessToken) return json(res, 401, { error: "deriv_not_connected" });
+  if (!authToken()) return json(res, 401, { error: "deriv_not_connected" });
 
   if (url.pathname === "/api/deriv/balance" && req.method === "GET") {
     const account = await connectedAccount();
