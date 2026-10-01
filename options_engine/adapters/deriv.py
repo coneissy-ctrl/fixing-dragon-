@@ -348,6 +348,25 @@ class DerivOptionsDemo(ExecutionAdapter):
         )
         return response.get("contracts_for", {}).get("available", [])
 
+    async def historical_candles(self, symbol: str, granularity: int, count: int = 80) -> list[dict[str, Any]]:
+        """Fetch recent completed candles so strategies can start without waiting for warm-up."""
+        req_id = self._next_req_id()
+        response = await self._send(
+            self._market_ws,
+            {
+                "ticks_history": symbol,
+                "end": "latest",
+                "count": count,
+                "style": "candles",
+                "granularity": int(granularity),
+                "req_id": req_id,
+            },
+        )
+        rows = response.get("candles") or (response.get("history") or {}).get("candles") or []
+        if not isinstance(rows, list):
+            raise DerivAdapterError("Deriv ticks_history candles response has unexpected shape")
+        return rows
+
     async def subscribe_ticks(self, symbol: str) -> None:
         req_id = self._next_req_id()
         await self._send(
