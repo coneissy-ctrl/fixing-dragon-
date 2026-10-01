@@ -12,6 +12,54 @@ const LIVE_EXECUTION_ENABLED = process.env.DERIV_LIVE_EXECUTION_ENABLED === "tru
 const states = new Map();
 let session = null;
 
+// 30-second execution-readiness cycle. This refreshes account connectivity
+// and prepares executor state; it does not place trades automatically.
+const EXECUTOR_INTERVAL_MS = 30_000;
+let executorTimer = null;
+let executorRunning = false;
+const executorState = {
+  intervalSeconds: 30,
+  running: false,
+  lastRunAt: null,
+  nextRunAt: null,
+  lastStatus: "starting",
+  lastError: null,
+  cycles: 0,
+};
+
+async function executorCycle() {
+  if (executorRunning) return;
+  executorRunning = true;
+  executorState.running = true;
+  executorState.lastRunAt = new Date().toISOString();
+  executorState.nextRunAt = new Date(Date.now() + EXECUTOR_INTERVAL_MS).toISOString();
+  executorState.lastError = null;
+  try {
+    if (!authToken()) {
+      executorState.lastStatus = "waiting_for_connection";
+      return;
+    }
+    const account = await connectedAccount();
+    executorState.lastStatus = account.accountType === "real" ? "ready" : "demo_account";
+    executorState.cycles += 1;
+  } catch (e) {
+    executorState.lastStatus = "error";
+    executorState.lastError = e.message;
+  } finally {
+    executorRunning = false;
+    executorState.running = false;
+  }
+}
+
+function startExecutor() {
+  if (executorTimer) return;
+  executorState.nextRunAt = new Date(Date.now() + EXECUTOR_INTERVAL_MS).toISOString();
+  executorTimer = setInterval(() => executorCycle().catch(() => {}), EXECUTOR_INTERVAL_MS);
+  executorCycle().catch(() => {});
+}
+
+startExecutor();
+
 function json(res, status, body) {
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
@@ -142,6 +190,10 @@ async function callbackRedirect(returnTo, params) {
 async function handle(req, res) {
   if (req.method === "OPTIONS") return json(res, 204, {});
   const url = new URL(req.url, "http://localhost");
+
+  if (url.pathname === "/api/deriv/executor/status" && req.method === "GET") {
+    return json(res, 200, { ...executorState, intervalMs: EXECUTOR_INTERVAL_MS });
+  }
 
   if (url.pathname === "/health") {
     return json(res, 200, {
