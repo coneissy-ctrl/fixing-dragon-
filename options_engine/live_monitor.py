@@ -35,10 +35,12 @@ class LiveMonitor:
         self.fallback_strategies = {1: RSIMeanReversionStrategy(1), 5: RSIMeanReversionStrategy(5)}
         self.active_algorithm = {1: "primary", 5: "primary"}
         self.win_multiplier = Decimal(os.getenv("DERIV_WIN_MULTIPLIER", "1.5"))
+        # Initialize stakes before deriving base_stakes; otherwise the monitor
+        # crashes during startup and never reaches the live tick/signal loop.
+        self.stakes = {1: Decimal("0.5"), 5: Decimal("2")}
         self.base_stakes = dict(self.stakes)
         self.algorithm_searching = {1: False, 5: False}
         self.candles: dict[int, list[Any]] = {1: [], 5: []}
-        self.stakes = {1: Decimal("0.5"), 5: Decimal("2")}
         self.oauth_client_id = os.getenv("DERIV_CLIENT_ID")
         self.oauth_redirect_uri = os.getenv(
             "DERIV_REDIRECT_URI",
