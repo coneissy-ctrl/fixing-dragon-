@@ -113,7 +113,7 @@ class LiveMonitor:
             return
         async with self.execution_lock:
             now = time.time()
-            min_interval = float(os.getenv("DERIV_MIN_EXECUTION_INTERVAL", "60"))
+            min_interval = float(os.getenv("DERIV_MIN_EXECUTION_INTERVAL", "30"))
             if now - self.last_execution_at < min_interval:
                 return
             try:
