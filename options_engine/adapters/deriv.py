@@ -27,7 +27,7 @@ DEMO_WS_MARKER = "/trading/v1/options/ws/demo"
 REAL_WS_MARKER = "/trading/v1/options/ws/real"
 DERIV_MCP_URL = "https://mcp-api.deriv.com/mcp"
 FIXED_STAKES = {30: Decimal("0.25"), 60: Decimal("0.25"), 300: Decimal("2")}
-DEFAULT_MAX_STAKES = {60: Decimal(os.getenv("DERIV_MAX_STAKE_1M", "5")), 300: Decimal(os.getenv("DERIV_MAX_STAKE_5M", "10"))}
+DEFAULT_MAX_STAKES = {30: Decimal(os.getenv("DERIV_MAX_STAKE_30S", "5")), 60: Decimal(os.getenv("DERIV_MAX_STAKE_1M", "5")), 300: Decimal(os.getenv("DERIV_MAX_STAKE_5M", "10"))}
 
 
 class DerivAdapterError(RuntimeError):
