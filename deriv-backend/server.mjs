@@ -367,6 +367,57 @@ async function handle(req, res) {
     return json(res, 200, { ...executorState, intervalMs: EXECUTOR_INTERVAL_MS });
   }
 
+  if (url.pathname === "/dashboard" && req.method === "GET") {
+    res.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "access-control-allow-origin": process.env.FRONTEND_ORIGIN || "*",
+    });
+    return res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DerivOnly Live Dashboard</title>
+<style>
+body{margin:0;background:#0b1020;color:#eef2ff;font:14px system-ui,Segoe UI,sans-serif}
+.wrap{max-width:1400px;margin:auto;padding:22px}.top{display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}
+h1{margin:0;font-size:25px}.muted{color:#9aa6bf}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+.card{background:#121a2d;border:1px solid #24304a;border-radius:14px;padding:16px}.big{font-size:25px;font-weight:700;margin-top:7px}
+.ok{color:#55e39a}.warn{color:#ffd166}.danger{color:#ff6b7a}
+table{width:100%;border-collapse:collapse}.card table{margin-top:8px}th,td{text-align:left;padding:9px;border-bottom:1px solid #202b43}th{color:#9aa6bf;font-weight:500}
+.pill{display:inline-block;padding:5px 9px;border-radius:99px;background:#1b2740}.bar{height:8px;background:#202b43;border-radius:9px;overflow:hidden}.fill{height:100%;background:#55e39a}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.grid{grid-template-columns:1fr}}
+</style></head><body><div class="wrap">
+<div class="top"><div><h1>DerivOnly — Live Paper Dashboard</h1><div class="muted">5-minute CALL / PUT engine · live market data · real execution OFF</div></div><div id="clock" class="pill">--</div></div>
+<div class="grid">
+<div class="card"><div class="muted">MODE</div><div class="big ok">PAPER</div></div>
+<div class="card"><div class="muted">STAKE</div><div class="big">$0.50</div></div>
+<div class="card"><div class="muted">ENTRIES</div><div class="big" id="entries">0 / 5</div></div>
+<div class="card"><div class="muted">DRAWDOWN</div><div class="big" id="dd">0%</div></div>
+</div>
+<div class="grid">
+<div class="card"><div class="muted">5-MIN EXPIRY</div><div class="big">ACTIVE</div></div>
+<div class="card"><div class="muted">CONFIDENCE</div><div class="big">≥80</div></div>
+<div class="card"><div class="muted">RECOVERY</div><div class="big">1 MAX</div></div>
+<div class="card"><div class="muted">3RD MARTINGALE</div><div class="big ok">OFF</div></div>
+</div>
+<div class="card"><h3>Session</h3><div id="session">Loading...</div></div>
+<div class="card" style="margin-top:12px"><h3>20-Instrument Watchlist</h3><table><thead><tr><th>Instrument</th><th>Signal</th><th>Confidence</th><th>Price</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+async function get(p){const r=await fetch(p,{cache:"no-store"});return r.json()}
+async function refresh(){
+ try{
+  const [cfg,sess,sig]=await Promise.all([get("/api/deriv/config"),get("/api/deriv/session"),get("/api/deriv/signals")]);
+  $("entries").textContent=sess.entries+" / "+cfg.maxEntries;
+  $("dd").textContent=(sess.drawdown_pct||0).toFixed(1)+"%";
+  $("session").innerHTML="<span class='pill'>Last entry: "+(sess.lastEntry?sess.lastEntry.symbol+" · "+sess.lastEntry.direction+" · "+sess.lastEntry.confidence+"%":"none")+"</span> <span class='pill'>Recovery: "+sess.recoveryAttempts+" / "+cfg.maxRecoveryAttempts+"</span> <span class='pill'>Hard stop: "+(sess.hardStopped?"YES":"NO")+"</span>";
+  $("rows").innerHTML=sig.signals.map(s=>"<tr><td>"+s.symbol+"</td><td>"+(s.direction||"—")+"</td><td>"+(s.confidence||0)+"%</td><td>"+(s.price??"—")+"</td><td>"+(s.eligible?"<span class='ok'>ELIGIBLE</span>":"<span class='muted'>WAIT</span>")+"</td></tr>").join("");
+  $("clock").textContent=new Date().toLocaleTimeString();
+ }catch(e){$("session").textContent="Dashboard data error: "+e.message}
+}
+refresh();setInterval(refresh,5000);setInterval(()=>{$("clock").textContent=new Date().toLocaleTimeString()},1000);
+</script></body></html>`);
+  }
+
   if (url.pathname === "/health") {
     return json(res, 200, {
       ok: true,
