@@ -22,7 +22,7 @@ from .dashboard import DashboardState, serve_dashboard
 
 class LiveMonitor:
     def __init__(self, symbol: str | None = None):
-        self.symbol = symbol or os.getenv("DERIV_SYMBOL", "1HZ100V")
+        self.symbol = symbol or "frxXAUUSD"
         self.adapter = DerivOptionsDemo(timeout=float(os.getenv("DERIV_WS_TIMEOUT", "12")))
         self.state = DashboardState(
             symbol=self.symbol,
@@ -285,18 +285,27 @@ class LiveMonitor:
             for x in symbols
             if x.get("underlying_symbol") or x.get("symbol")
         }
-        candidates = [
-            self.symbol, "1HZ100V", "1HZ10V", "1HZ25V",
-            "R_100", "R_75", "R_50", "R_25", "R_10",
-        ]
+        gold_candidates = []
+        for item in symbols:
+            code = str(item.get("underlying_symbol") or item.get("symbol") or "")
+            name = str(item.get("underlying_symbol_name") or item.get("display_name") or "").upper()
+            if code and ("XAU" in code.upper() or "GOLD" in name or "XAU" in name):
+                gold_candidates.append(code)
+
+        candidates = []
+        for candidate in [self.symbol, "frxXAUUSD", *gold_candidates]:
+            if candidate and candidate not in candidates:
+                candidates.append(candidate)
+
         selected = None
         for candidate in candidates:
             if candidate not in available:
                 continue
             try:
-                await self.adapter.contracts_for(candidate)
-                selected = candidate
-                break
+                contracts = await self.adapter.contracts_for(candidate)
+                if any(str(x.get("contract_type", "")).upper() in {"CALL", "PUT"} for x in contracts):
+                    selected = candidate
+                    break
             except DerivAdapterError:
                 continue
         if selected is None:
@@ -327,6 +336,7 @@ class LiveMonitor:
                     continue
                 self.candles[tf].append(completed)
                 self.candles[tf] = self.candles[tf][-80:]
+                self.state.candle_data[tf] = [asdict(c) for c in self.candles[tf]]
                 self.state.candles[tf] += 1
                 signal = self.strategies[tf].generate(
                     self.symbol, self.candles[tf], self.stakes[tf]
@@ -340,6 +350,7 @@ class LiveMonitor:
                         "expiry_seconds": signal.expiry_seconds,
                         "candle_timestamp": signal.candle_timestamp,
                         "reason": signal.reason,
+                        "analysis": signal.analysis or {},
                     }
                     await self._execute_signal(signal)
             self.state.updated_at = time.time()
