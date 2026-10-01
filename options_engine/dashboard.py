@@ -55,54 +55,111 @@ class DashboardState:
 
 
 HTML = r"""<!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>deriveonly</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>deriveonly | Deriv Options</title>
 <style>
-body{margin:0;background:#07111d;color:#edf5ff;font:14px system-ui;padding:20px}
-.wrap{max-width:1100px;margin:auto}.top{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.card{background:#0d1a29;border:1px solid #20364c;border-radius:14px;padding:16px;margin-top:14px}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.v{font-size:25px;font-weight:800;margin-top:5px}
-.muted{color:#8da3bb;font-size:11px;text-transform:uppercase}.ok{color:#65dfa0}.safe{color:#ffc96b}.danger{color:#ff7b7b}
-.signal{padding:12px;background:#101f31;border-radius:10px;margin-top:8px}
-@media(max-width:700px){.grid{grid-template-columns:repeat(2,1fr)}}a{color:#65dfa0;font-weight:800}
-</style></head><body><div class="wrap">
-<div class="top"><div><div class="muted">DERIVONLY</div><h1>Deriv Options Engine</h1>
-<div class="muted">Live market data - authenticated account channel when connected</div></div>
-<div id="status" class="safe">CONNECTING</div></div>
+:root{--bg:#07101a;--panel:#0c1825;--panel2:#101f2e;--line:#1d3449;--text:#eef6ff;--muted:#7f97ae;--green:#35e59a;--amber:#ffc857;--red:#ff6878;--blue:#58a6ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 85% -10%,#12314b 0,transparent 35%),var(--bg);color:var(--text);font:14px Inter,ui-sans-serif,system-ui,-apple-system,sans-serif}
+.wrap{max-width:1320px;margin:auto;padding:20px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:12px;background:#10283b;border:1px solid #28516e;display:grid;place-items:center;font-weight:900;color:var(--green)}
+h1{font-size:23px;margin:0}.sub{color:var(--muted);font-size:12px;margin-top:3px}
+.pill{border:1px solid var(--line);background:#0c1a27;border-radius:999px;padding:9px 13px;font-weight:800;font-size:12px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;background:var(--amber)}.online .dot{background:var(--green)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.card{background:linear-gradient(180deg,#0d1a28,#0a1521);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 8px 30px #0003}.label{color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.value{font-size:27px;font-weight:850;margin-top:8px;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:5px}.green{color:var(--green)}.amber{color:var(--amber)}.red{color:var(--red)}
+.span2{grid-column:span 2}.span4{grid-column:span 4}.section{margin-top:14px}.sectionTitle{display:flex;justify-content:space-between;align-items:center;margin:0 0 10px;font-size:13px;font-weight:800}
+.market{display:grid;grid-template-columns:1.3fr .7fr;gap:12px}.quote{font-size:46px;font-weight:900;margin:7px 0}.tickbar{height:80px;display:flex;align-items:flex-end;gap:4px;padding-top:10px}.bar{flex:1;min-width:2px;background:#1d4961;border-radius:4px 4px 1px 1px;opacity:.9}
+.rows{display:grid;gap:9px}.row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #183047}.row:last-child{border-bottom:0}.row b{font-weight:750}.status{font-weight:850}
+.signal{background:var(--panel2);border:1px solid #234058;border-radius:13px;padding:14px}.signalHead{display:flex;justify-content:space-between;align-items:center}.direction{font-size:20px;font-weight:900}.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.tag{background:#0b1723;border:1px solid #20384e;border-radius:8px;padding:6px 8px;color:#b8c9d9;font-size:11px}.reason{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.45}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}a.btn{display:inline-block;text-decoration:none;color:var(--text);border:1px solid #2a4c64;background:#102438;border-radius:10px;padding:10px 13px;font-weight:800;font-size:12px}a.btn.primary{border-color:#276d57;background:#0d3027;color:var(--green)}
+.health{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.healthItem{padding:12px;background:#0a1521;border:1px solid #193249;border-radius:11px}.healthItem b{display:block;margin-top:5px}
+footer{color:#61798e;text-align:center;font-size:10px;padding:18px 0}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.span4{grid-column:span 2}.market{grid-template-columns:1fr}.health{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.wrap{padding:13px}.grid{grid-template-columns:1fr 1fr;gap:8px}.card{padding:13px;border-radius:13px}.value{font-size:22px}.quote{font-size:36px}.health{grid-template-columns:1fr 1fr}}
+</style></head>
+<body><div class="wrap">
+<header class="top">
+<div class="brand"><div class="logo">D</div><div><h1>deriveonly</h1><div class="sub">Live Deriv Options Control Center</div></div></div>
+<div id="topStatus" class="pill"><span class="dot"></span>CONNECTING</div>
+</header>
+
 <div class="grid">
-<div class="card"><div class="muted">Symbol</div><div id="symbol" class="v">--</div></div>
-<div class="card"><div class="muted">Live quote</div><div id="quote" class="v">--</div></div>
-<div class="card"><div class="muted">Ticks</div><div id="ticks" class="v">0</div></div>
-<div class="card"><div class="muted">Execution</div><div id="execution" class="v safe">AUTH REQUIRED</div></div>
-<div class="card"><div class="muted">Real balance</div><div id="balance" class="v">--</div><div id="balanceMeta" class="muted">Connect Deriv</div></div>
+<div class="card"><div class="label">Account Balance</div><div id="balance" class="value">--</div><div id="balanceMeta" class="small">Waiting for live account data</div></div>
+<div class="card"><div class="label">Execution</div><div id="execution" class="value amber">--</div><div id="execMeta" class="small">Authentication status</div></div>
+<div class="card"><div class="label">Symbol</div><div id="symbol" class="value">--</div><div class="small">Live market stream</div></div>
+<div class="card"><div class="label">Ticks</div><div id="ticks" class="value">0</div><div id="tickAge" class="small">Waiting for tick</div></div>
 </div>
-<div class="card"><div class="muted">Completed candles</div><div class="grid">
-<div><div>1-minute</div><div id="c1" class="v">0</div></div>
-<div><div>5-minute</div><div id="c5" class="v">0</div></div>
-<div><div>1m signals</div><div id="s1" class="v">0</div></div>
-<div><div>5m signals</div><div id="s5" class="v">0</div></div>
+
+<div class="section market">
+<div class="card"><div class="label">Live Market</div><div id="quote" class="quote">--</div><div class="small">Current Deriv quote</div><div id="bars" class="tickbar"></div></div>
+<div class="card"><div class="label">Trading Configuration</div><div class="rows">
+<div class="row"><span>Entry duration</span><b>30 seconds</b></div>
+<div class="row"><span>30s stake</span><b>$0.25</b></div>
+<div class="row"><span>1m stake</span><b>$0.25</b></div>
+<div class="row"><span>5m stake</span><b>$2.00</b></div>
+<div class="row"><span>Martingale</span><b class="green">OFF</b></div>
 </div></div>
-<div class="card"><div class="muted">Deriv account</div>
-<div><a href="/auth/deriv/login">CONNECT DERIV ACCOUNT</a></div>
-<div id="account">Not authenticated</div><div id="authmsg">OAuth authorization is required before account-scoped operations.</div>
-<div>Configured stakes: 30s = $0.25 - 1m = $0.25 - 5m = $2.00 - Martingale = OFF</div></div>
-<div class="card"><div class="muted">Latest signals</div><div id="signals">Waiting for completed candles...</div></div>
+</div>
+
+<div class="section"><div class="sectionTitle"><span>Strategy & Signals</span><span id="signalCount" class="small">0 signals</span></div>
+<div class="grid">
+<div class="card span2"><div class="label">1 Minute Engine</div><div id="sig1" class="signal"><div class="small">Waiting for qualifying candle...</div></div></div>
+<div class="card span2"><div class="label">5 Minute Engine</div><div id="sig5" class="signal"><div class="small">Waiting for qualifying candle...</div></div></div>
+</div></div>
+
+<div class="section"><div class="sectionTitle"><span>Engine Activity</span></div>
+<div class="grid">
+<div class="card"><div class="label">1m Candles</div><div id="c1" class="value">0</div></div>
+<div class="card"><div class="label">5m Candles</div><div id="c5" class="value">0</div></div>
+<div class="card"><div class="label">1m Signals</div><div id="s1" class="value">0</div></div>
+<div class="card"><div class="label">5m Signals</div><div id="s5" class="value">0</div></div>
+</div></div>
+
+<div class="section"><div class="sectionTitle"><span>System Health</span><span id="refresh" class="small">Updating every second</span></div>
+<div class="card"><div class="health">
+<div class="healthItem"><div class="label">Deriv API</div><b id="hAuth">--</b></div>
+<div class="healthItem"><div class="label">Live Tick Stream</div><b id="hTicks">--</b></div>
+<div class="healthItem"><div class="label">Balance</div><b id="hBalance">--</b></div>
+<div class="healthItem"><div class="label">Last Update</div><b id="hUpdate">--</b></div>
+</div><div class="actions"><a class="btn primary" href="/auth/deriv/login">CONNECT DERIV ACCOUNT</a><a class="btn" href="/account/balance">ACCOUNT BALANCE API</a><a class="btn" href="/health">ENGINE HEALTH API</a></div></div></div>
+
+<footer>deriveonly · live status is read from the running Deriv engine · no credentials are displayed</footer>
 </div>
 <script>
+const bars=[];
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function setText(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
+function signalHtml(s){
+ if(!s||s.error)return '<div class="small">'+esc(s?.error||'Waiting for qualifying candle...')+'</div>';
+ const d=String(s.direction||'SIGNAL').toUpperCase(), cls=d==='CALL'?'green':d==='PUT'?'red':'amber';
+ return '<div class="signalHead"><span class="direction '+cls+'">'+esc(d)+'</span><span class="small">'+esc(s.expiry_seconds||30)+'s expiry</span></div>'+
+ '<div class="meta"><span class="tag">Stake $'+esc(s.stake)+'</span><span class="tag">Confidence '+esc(s.confidence)+'</span></div>'+
+ '<div class="reason">'+esc(s.reason||'Signal generated')+'</div>'+
+ (s.execution?'<div class="small green" style="margin-top:9px">Execution response received</div>':'')+
+ (s.execution_error?'<div class="small red" style="margin-top:9px">Execution error: '+esc(s.execution_error)+'</div>':'');
+}
 async function load(){
-try{
-const r=await fetch('/health?ts='+Date.now(),{cache:'no-store'}),d=await r.json();
-status.textContent=d.status; status.className=(d.status==='LIVE_DATA'||d.status==='LIVE_ACCOUNT_CONNECTED'||d.status==='AUTHENTICATED_READ_ONLY')?'ok':'safe';
-symbol.textContent=d.symbol; quote.textContent=d.quote||'--'; ticks.textContent=d.tick_count; execution.textContent=d.execution;
-execution.className='v '+(d.real_money&&d.authenticated?'ok':'safe');
-balance.textContent=d.balance!==null&&d.balance!==undefined?String(d.balance)+' USD':'--';
-balanceMeta.textContent=d.balance_updated_at?'Live balance - '+new Date(d.balance_updated_at*1000).toLocaleTimeString():(d.balance_error||'Connect Deriv');
-c1.textContent=d.candles['1']||0;c5.textContent=d.candles['5']||0;s1.textContent=d.signals['1']||0;s5.textContent=d.signals['5']||0;
-account.textContent=(d.account_id?'Account '+d.account_id+' - ':'')+String(d.account_mode||'demo').toUpperCase()+(d.authenticated?' - AUTHENTICATED':' - NOT AUTHENTICATED');
-authmsg.textContent=d.auth_error?'Last OAuth/API error: '+d.auth_error:'OAuth/account authentication status is shown above.';
-let x=[];for(const tf of [1,5]){const s=d.last_signals[String(tf)]||d.last_signals[tf];if(s)x.push('<div class="signal"><b>'+tf+'m '+s.direction+'</b> - stake $'+s.stake+' - confidence '+s.confidence+' - expiry '+s.expiry_seconds+'s<br><span class="muted">'+s.reason+'</span></div>')}
-signals.innerHTML=x.join('')||'Waiting for qualifying completed candles...';
-}catch(e){status.textContent='OFFLINE';status.className='danger'}}
+ try{
+  const r=await fetch('/health?ts='+Date.now(),{cache:'no-store'});const d=await r.json();
+  const live=['LIVE_DATA','LIVE_ACCOUNT_CONNECTED','AUTHENTICATED_READ_ONLY'].includes(d.status);
+  const real=!!(d.real_money&&d.authenticated);
+  const top=document.getElementById('topStatus');top.className='pill '+(live?'online':'');top.innerHTML='<span class="dot"></span>'+esc(d.status);
+  setText('balance',d.balance!=null?d.balance+' USD':'--');
+  setText('balanceMeta',d.balance_updated_at?'Live · '+new Date(d.balance_updated_at*1000).toLocaleTimeString():(d.balance_error||'Waiting for live account data'));
+  setText('execution',d.execution||'--');document.getElementById('execution').className='value '+(real?'green':'amber');
+  setText('execMeta',real?'Real execution enabled':'Authentication / execution status');
+  setText('symbol',d.symbol||'--');setText('quote',d.quote||'--');setText('ticks',d.tick_count||0);
+  const age=d.last_tick_at?Math.max(0,Date.now()/1000-d.last_tick_at):null;setText('tickAge',age!=null?'Last tick '+age.toFixed(1)+'s ago':'Waiting for tick');
+  setText('c1',d.candles?.['1']||0);setText('c5',d.candles?.['5']||0);setText('s1',d.signals?.['1']||0);setText('s5',d.signals?.['5']||0);
+  const total=(d.signals?.['1']||0)+(d.signals?.['5']||0);setText('signalCount',total+' signals');
+  setText('hAuth',d.authenticated?'CONNECTED':'NOT CONNECTED');document.getElementById('hAuth').className=d.authenticated?'green':'amber';
+  setText('hTicks',age!=null&&age<10?'HEALTHY':'WAITING');document.getElementById('hTicks').className=age!=null&&age<10?'green':'amber';
+  setText('hBalance',d.balance!=null?'LIVE':'UNAVAILABLE');document.getElementById('hBalance').className=d.balance!=null?'green':'amber';
+  setText('hUpdate',d.updated_at?new Date(d.updated_at*1000).toLocaleTimeString():'--');
+  setText('refresh','Updated '+new Date().toLocaleTimeString());
+  setText('sig1','');document.getElementById('sig1').innerHTML=signalHtml(d.last_signals?.['1']||d.last_signals?.[1]);
+  document.getElementById('sig5').innerHTML=signalHtml(d.last_signals?.['5']||d.last_signals?.[5]);
+  if(d.quote!=null){bars.push(Number(d.quote));if(bars.length>40)bars.shift();const min=Math.min(...bars),max=Math.max(...bars),range=max-min||1;document.getElementById('bars').innerHTML=bars.map(v=>'<span class="bar" style="height:'+Math.max(8,((v-min)/range)*65)+'px"></span>').join('');}
+ }catch(e){const top=document.getElementById('topStatus');top.className='pill';top.innerHTML='<span class="dot"></span>OFFLINE';}
+}
 load();setInterval(load,1000);
 </script></body></html>"""
 
