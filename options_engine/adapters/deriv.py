@@ -109,7 +109,7 @@ class DerivOptionsDemo(ExecutionAdapter):
         self.auth_method = os.getenv("DERIV_AUTH_METHOD", "oauth").lower()
         # OAuth/PAT bearer tokens may be supplied by Render environment variables.
         # This lets a configured token survive a Render process restart.
-        self.auth_token = auth_token if auth_token is not None else os.getenv("DERIV_AUTH_TOKEN")
+        self.auth_token = auth_token if auth_token is not None else (os.getenv("DERIV_PAT") or os.getenv("DERIV_AUTH_TOKEN"))
         self.app_id = app_id or os.getenv("DERIV_APP_ID")
         if self.auth_method not in {"oauth", "pat"}:
             raise ValueError("DERIV_AUTH_METHOD must be oauth or pat")
@@ -141,7 +141,7 @@ class DerivOptionsDemo(ExecutionAdapter):
     def _require_credentials(self) -> None:
         missing = []
         if not self.auth_token:
-            missing.append("DERIV_AUTH_TOKEN")
+            missing.append("DERIV_PAT (or DERIV_AUTH_TOKEN)")
         if not self.account_id:
             missing.append("DERIV_ACCOUNT_ID")
         if missing:
