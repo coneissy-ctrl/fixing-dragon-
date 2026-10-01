@@ -30,6 +30,7 @@ class DashboardState:
     balance: str | None = None
     balance_updated_at: float | None = None
     balance_error: str | None = None
+    candle_data: dict[int, list[dict[str, Any]]] = field(default_factory=lambda: {1: [], 5: []})
 
     def payload(self) -> dict[str, Any]:
         authenticated = self.status in {"AUTHENTICATED_READ_ONLY", "LIVE_ACCOUNT_CONNECTED"}
@@ -50,6 +51,7 @@ class DashboardState:
             "account_mode": self.account_mode, "live_execution_enabled": self.live_execution_enabled,
             "balance": self.balance, "balance_updated_at": self.balance_updated_at,
             "balance_error": self.balance_error, "auth_error": self.auth_error,
+            "candle_data": self.candle_data,
             "stakes": {"30s": "0.25", "1m": "0.25", "5m": "2.00"}, "martingale": False,
         }
 
@@ -66,7 +68,7 @@ h1{font-size:23px;margin:0}.sub{color:var(--muted);font-size:12px;margin-top:3px
 .pill{border:1px solid var(--line);background:#0c1a27;border-radius:999px;padding:9px 13px;font-weight:800;font-size:12px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;background:var(--amber)}.online .dot{background:var(--green)}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.card{background:linear-gradient(180deg,#0d1a28,#0a1521);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 8px 30px #0003}.label{color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.value{font-size:27px;font-weight:850;margin-top:8px;letter-spacing:-.02em}.small{font-size:12px;color:var(--muted);margin-top:5px}.green{color:var(--green)}.amber{color:var(--amber)}.red{color:var(--red)}
 .span2{grid-column:span 2}.span4{grid-column:span 4}.section{margin-top:14px}.sectionTitle{display:flex;justify-content:space-between;align-items:center;margin:0 0 10px;font-size:13px;font-weight:800}
-.market{display:grid;grid-template-columns:1.3fr .7fr;gap:12px}.quote{font-size:46px;font-weight:900;margin:7px 0}.tickbar{height:80px;display:flex;align-items:flex-end;gap:4px;padding-top:10px}.bar{flex:1;min-width:2px;background:#1d4961;border-radius:4px 4px 1px 1px;opacity:.9}
+.market{display:grid;grid-template-columns:1.3fr .7fr;gap:12px}.quote{font-size:46px;font-weight:900;margin:7px 0}.chartWrap{height:330px;margin-top:12px;background:#08131e;border:1px solid #193249;border-radius:12px;overflow:hidden}.chartWrap canvas{width:100%;height:100%;display:block}
 .rows{display:grid;gap:9px}.row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #183047}.row:last-child{border-bottom:0}.row b{font-weight:750}.status{font-weight:850}
 .signal{background:var(--panel2);border:1px solid #234058;border-radius:13px;padding:14px}.signalHead{display:flex;justify-content:space-between;align-items:center}.direction{font-size:20px;font-weight:900}.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.tag{background:#0b1723;border:1px solid #20384e;border-radius:8px;padding:6px 8px;color:#b8c9d9;font-size:11px}.reason{color:var(--muted);font-size:12px;margin-top:10px;line-height:1.45}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}a.btn{display:inline-block;text-decoration:none;color:var(--text);border:1px solid #2a4c64;background:#102438;border-radius:10px;padding:10px 13px;font-weight:800;font-size:12px}a.btn.primary{border-color:#276d57;background:#0d3027;color:var(--green)}
@@ -89,7 +91,7 @@ footer{color:#61798e;text-align:center;font-size:10px;padding:18px 0}
 </div>
 
 <div class="section market">
-<div class="card"><div class="label">Live Market</div><div id="quote" class="quote">--</div><div class="small">Current Deriv quote</div><div id="bars" class="tickbar"></div></div>
+<div class="card"><div class="label">Gold XAU/USD</div><div id="quote" class="quote">--</div><div class="small">Live regular-options underlying</div><div class="chartWrap"><canvas id="chart"></canvas></div><div class="small">1-minute candlesticks · live</div></div>
 <div class="card"><div class="label">Trading Configuration</div><div class="rows">
 <div class="row"><span>Entry duration</span><b>30 seconds</b></div>
 <div class="row"><span>30s stake</span><b>$0.25</b></div>
@@ -136,6 +138,21 @@ function signalHtml(s){
  (s.execution?'<div class="small green" style="margin-top:9px">Execution response received</div>':'')+
  (s.execution_error?'<div class="small red" style="margin-top:9px">Execution error: '+esc(s.execution_error)+'</div>':'');
 }
+function drawChart(cs){
+ const canvas=document.getElementById('chart'); if(!canvas)return;
+ const rect=canvas.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+ canvas.width=Math.max(1,rect.width*dpr); canvas.height=Math.max(1,rect.height*dpr);
+ const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr);
+ const W=rect.width,H=rect.height,pad={l:8,r:8,t:12,b:20};
+ ctx.clearRect(0,0,W,H);
+ if(!cs.length){ctx.fillStyle='#7f97ae';ctx.font='12px system-ui';ctx.fillText('Waiting for Gold candles...',16,28);return;}
+ const data=cs.slice(-60), lo=Math.min(...data.map(x=>x.low)), hi=Math.max(...data.map(x=>x.high)), range=Math.max(hi-lo,1e-9);
+ const step=(W-pad.l-pad.r)/data.length, y=v=>pad.t+(hi-v)/range*(H-pad.t-pad.b);
+ ctx.strokeStyle='#193249';ctx.lineWidth=1;
+ for(let i=0;i<5;i++){const gy=pad.t+i*(H-pad.t-pad.b)/4;ctx.beginPath();ctx.moveTo(pad.l,gy);ctx.lineTo(W-pad.r,gy);ctx.stroke();}
+ data.forEach((x,i)=>{const px=pad.l+i*step+step/2, up=x.close>=x.open;ctx.strokeStyle=up?'#35e59a':'#ff6878';ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.moveTo(px,y(x.high));ctx.lineTo(px,y(x.low));ctx.stroke();const top=y(Math.max(x.open,x.close)),bot=y(Math.min(x.open,x.close));ctx.fillRect(px-step*.31,top,Math.max(2,step*.62),Math.max(1,bot-top));});
+ const last=data[data.length-1];ctx.fillStyle='#eef6ff';ctx.font='11px system-ui';ctx.fillText('Close '+Number(last.close).toFixed(2),W-95,12);
+}
 async function load(){
  try{
   const r=await fetch('/health?ts='+Date.now(),{cache:'no-store'});const d=await r.json();
@@ -157,7 +174,7 @@ async function load(){
   setText('refresh','Updated '+new Date().toLocaleTimeString());
   setText('sig1','');document.getElementById('sig1').innerHTML=signalHtml(d.last_signals?.['1']||d.last_signals?.[1]);
   document.getElementById('sig5').innerHTML=signalHtml(d.last_signals?.['5']||d.last_signals?.[5]);
-  if(d.quote!=null){bars.push(Number(d.quote));if(bars.length>40)bars.shift();const min=Math.min(...bars),max=Math.max(...bars),range=max-min||1;document.getElementById('bars').innerHTML=bars.map(v=>'<span class="bar" style="height:'+Math.max(8,((v-min)/range)*65)+'px"></span>').join('');}
+  drawChart(d.candle_data?.['1']||d.candle_data?.[1]||[]);
  }catch(e){const top=document.getElementById('topStatus');top.className='pill';top.innerHTML='<span class="dot"></span>OFFLINE';}
 }
 load();setInterval(load,1000);
