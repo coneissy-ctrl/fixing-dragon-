@@ -128,6 +128,9 @@ class DerivOptionsDemo(ExecutionAdapter):
         self._market_ws: Any | None = None
         self._account_ws: Any | None = None
         self._account_ws_lock = asyncio.Lock()
+        # Exactly one coroutine may perform recv() on the authenticated account socket.
+        # This prevents balance polling from racing proposal/buy operations.
+        self._account_io_lock = asyncio.Lock()
         self._req_id = 0
         self.connected = False
         self.enabled = True
@@ -293,19 +296,35 @@ class DerivOptionsDemo(ExecutionAdapter):
     ) -> dict[str, Any]:
         if ws is None:
             raise DerivAdapterError("Deriv WebSocket is not connected")
+        io_lock = self._account_io_lock if ws is self._account_ws else None
         try:
-            await ws.send(json.dumps(payload))
-            deadline = timeout or self.timeout
-            while True:
-                raw = await asyncio.wait_for(ws.recv(), timeout=deadline)
-                message = json.loads(raw)
-                if message.get("error"):
-                    error = message["error"]
-                    raise DerivAdapterError(
-                        f"Deriv API error {error.get('code')}: {error.get('message')}"
-                    )
-                if message.get("req_id") == payload.get("req_id"):
-                    return message
+            if io_lock is None:
+                await ws.send(json.dumps(payload))
+                deadline = timeout or self.timeout
+                while True:
+                    raw = await asyncio.wait_for(ws.recv(), timeout=deadline)
+                    message = json.loads(raw)
+                    if message.get("error"):
+                        error = message["error"]
+                        raise DerivAdapterError(
+                            f"Deriv API error {error.get('code')}: {error.get('message')}"
+                        )
+                    if message.get("req_id") == payload.get("req_id"):
+                        return message
+            else:
+                async with io_lock:
+                    await ws.send(json.dumps(payload))
+                    deadline = timeout or self.timeout
+                    while True:
+                        raw = await asyncio.wait_for(ws.recv(), timeout=deadline)
+                        message = json.loads(raw)
+                        if message.get("error"):
+                            error = message["error"]
+                            raise DerivAdapterError(
+                                f"Deriv API error {error.get('code')}: {error.get('message')}"
+                            )
+                        if message.get("req_id") == payload.get("req_id"):
+                            return message
         except ConnectionClosed as exc:
             if ws is self._account_ws:
                 self._account_ws = None
