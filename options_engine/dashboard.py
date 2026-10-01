@@ -56,7 +56,7 @@ class DashboardState:
 
 HTML = r"""<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dragon Options Engine</title>
+<title>deriveonly</title>
 <style>
 body{margin:0;background:#07111d;color:#edf5ff;font:14px system-ui;padding:20px}
 .wrap{max-width:1100px;margin:auto}.top{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
@@ -66,7 +66,7 @@ body{margin:0;background:#07111d;color:#edf5ff;font:14px system-ui;padding:20px}
 .signal{padding:12px;background:#101f31;border-radius:10px;margin-top:8px}
 @media(max-width:700px){.grid{grid-template-columns:repeat(2,1fr)}}a{color:#65dfa0;font-weight:800}
 </style></head><body><div class="wrap">
-<div class="top"><div><div class="muted">DRAGON OPTIONS ENGINE</div><h1>Deriv Options Engine</h1>
+<div class="top"><div><div class="muted">DERIVONLY</div><h1>Deriv Options Engine</h1>
 <div class="muted">Live market data - authenticated account channel when connected</div></div>
 <div id="status" class="safe">CONNECTING</div></div>
 <div class="grid">

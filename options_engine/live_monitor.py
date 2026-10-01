@@ -36,7 +36,7 @@ class LiveMonitor:
         self.oauth_client_id = os.getenv("DERIV_CLIENT_ID")
         self.oauth_redirect_uri = os.getenv(
             "DERIV_REDIRECT_URI",
-            "https://dragon-options-demo-dashboard.onrender.com/oauth/deriv/callback",
+            "https://deriveonlyrender.onrender.com/oauth/deriv/callback",
         )
         # state -> (PKCE verifier, created_at, validated return URL)
         self.oauth_states: dict[str, tuple[str, float, str]] = {}
@@ -57,7 +57,7 @@ class LiveMonitor:
     def _validate_oauth_return_url(self, return_to: str | None) -> str:
         default = os.getenv(
             "DERIV_OAUTH_RETURN_URL",
-            "https://dragon-options-demo-dashboard.onrender.com/",
+            "https://deriveonlyrender.onrender.com/",
         )
         candidate = (return_to or default).strip()
         allowed = [
@@ -67,7 +67,7 @@ class LiveMonitor:
         ]
         if not allowed:
             allowed = [
-                "https://dragon-options-demo-dashboard.onrender.com",
+                "https://deriveonlyrender.onrender.com",
             ]
         try:
             parsed = __import__("urllib.parse", fromlist=["urlparse"]).urlparse(candidate)
