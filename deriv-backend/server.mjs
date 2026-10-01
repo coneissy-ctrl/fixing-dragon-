@@ -4,7 +4,6 @@ import crypto from "node:crypto";
 const PORT = Number(process.env.PORT || 10000);
 const CLIENT_ID = process.env.DERIV_CLIENT_ID || process.env.DERIV_APP_ID || "";
 const REDIRECT_URI = process.env.DERIV_REDIRECT_URI || "";
-const APP_ID = process.env.DERIV_APP_ID || "";
 const API_KEY = process.env.DERIV_BACKEND_API_KEY || "";
 const LIVE_EXECUTION_ENABLED = process.env.DERIV_LIVE_EXECUTION_ENABLED === "true";
 
@@ -58,7 +57,6 @@ async function derivFetch(path, options = {}) {
     accept: "application/json",
     ...(options.headers || {}),
   };
-  if (APP_ID) headers["Deriv-App-ID"] = APP_ID;
   return fetch("https://api.derivws.com" + path, { ...options, headers });
 }
 
