@@ -3,7 +3,6 @@ import crypto from "node:crypto";
 
 const PORT = Number(process.env.PORT || 10000);
 const CLIENT_ID = process.env.DERIV_CLIENT_ID || process.env.DERIV_APP_ID || "";
-const CLIENT_SECRET = process.env.DERIV_CLIENT_SECRET || "";
 const REDIRECT_URI = process.env.DERIV_REDIRECT_URI || "";
 const APP_ID = process.env.DERIV_APP_ID || "";
 const API_KEY = process.env.DERIV_BACKEND_API_KEY || "";
@@ -166,7 +165,6 @@ async function handle(req, res) {
     const tokenBody = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
       code,
       code_verifier: pending.verifier,
       redirect_uri: REDIRECT_URI,
