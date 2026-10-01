@@ -40,6 +40,7 @@ class LiveMonitor:
         self.stakes = {1: Decimal("0.5"), 5: Decimal("2")}
         self.base_stakes = dict(self.stakes)
         self.algorithm_searching = {1: False, 5: False}
+        self.state.signal_status = {1: "WAITING", 5: "WAITING"}
         self.candles: dict[int, list[Any]] = {1: [], 5: []}
         self.oauth_client_id = os.getenv("DERIV_CLIENT_ID")
         self.oauth_redirect_uri = os.getenv(
@@ -186,6 +187,8 @@ class LiveMonitor:
             if is_won:
                 next_stake = signal.stake * self.win_multiplier
                 self.stakes[signal.timeframe_minutes] = next_stake
+                self.state.last_signals[signal.timeframe_minutes]["execution_result"] = "WON"
+                self.state.signal_status[signal.timeframe_minutes] = "WON"
                 print(
                     f"DERIV_RESULT WON contract_id={contract_id} stake={signal.stake} "
                     f"next_stake={next_stake} multiplier={self.win_multiplier}",
@@ -198,6 +201,7 @@ class LiveMonitor:
                 self.algorithm_searching[tf] = True
                 self.active_algorithm[tf] = "searching_after_loss"
                 self.state.last_signals[tf]["execution_result"] = "LOST_STOPPED_SEARCHING"
+                self.state.signal_status[tf] = "LOST_STOPPED"
                 print(
                     f"DERIV_RESULT LOST contract_id={contract_id} "
                     f"action=STOP_NEW_TRADES algorithm_search=1",
@@ -481,6 +485,7 @@ class LiveMonitor:
             self.state.quote = str(tick.quote)
 
             for tf, agg in self.aggregators.items():
+                self.state.signal_status[tf] = "SCANNING"
                 completed = agg.update(tick.epoch, float(tick.quote))
                 if completed is None:
                     continue
@@ -493,6 +498,7 @@ class LiveMonitor:
                     self.symbol, self.candles[tf], self.stakes[tf]
                 )
                 if signal:
+                    self.state.signal_status[tf] = "SIGNAL_FOUND"
                     if self.algorithm_searching[tf]:
                         self.algorithm_searching[tf] = False
                         self.active_algorithm[tf] = "fallback_rsi_mean_reversion"
@@ -522,6 +528,10 @@ class LiveMonitor:
                         },
                     )
                     await self._execute_signal(signal)
+                    if "execution" in self.state.last_signals[tf]:
+                        self.state.signal_status[tf] = "EXECUTED"
+                    elif "execution_error" in self.state.last_signals[tf]:
+                        self.state.signal_status[tf] = "EXECUTION_ERROR"
             self.state.updated_at = time.time()
 
     async def close(self) -> None:
