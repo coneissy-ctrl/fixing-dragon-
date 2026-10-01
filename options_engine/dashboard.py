@@ -22,6 +22,7 @@ class DashboardState:
     candles: dict[int, int] = field(default_factory=lambda: {1: 0, 5: 0})
     signals: dict[int, int] = field(default_factory=lambda: {1: 0, 5: 0})
     last_signals: dict[int, dict[str, Any]] = field(default_factory=dict)
+    signal_status: dict[int, str] = field(default_factory=lambda: {1: "WAITING", 5: "WAITING"})
     last_tick: dict[str, Any] | None = None
     auth_error: str | None = None
     account_id: str | None = None
@@ -44,7 +45,7 @@ class DashboardState:
             "status": self.status, "symbol": self.symbol, "connected_at": self.connected_at,
             "updated_at": self.updated_at, "last_tick_at": self.last_tick_at,
             "quote": self.quote, "tick_count": self.tick_count, "candles": self.candles,
-            "signals": self.signals, "last_signals": self.last_signals, "execution": execution,
+            "signals": self.signals, "last_signals": self.last_signals, "signal_status": self.signal_status, "execution": execution,
             "real_money": self.account_mode == "real" and self.live_execution_enabled,
             "authenticated": authenticated,
             "account_id": f"...{self.account_id[-4:]}" if self.account_id else None,
@@ -129,8 +130,9 @@ footer{color:#61798e;text-align:center;font-size:10px;padding:18px 0}
 const bars=[];
 function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
 function setText(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
-function signalHtml(s){
- if(!s||s.error)return '<div class="small">'+esc(s?.error||'Waiting for qualifying candle...')+'</div>';
+function signalHtml(s,status){
+ const st=String(status||'WAITING').toUpperCase();
+ if(!s||s.error)return '<div class="signalHead"><span class="direction amber">'+esc(st)+'</span></div><div class="small">'+esc(s?.error||'Scanning for a qualifying CALL / PUT signal...')+'</div>';
  const d=String(s.direction||'SIGNAL').toUpperCase(), cls=d==='CALL'?'green':d==='PUT'?'red':'amber';
  return '<div class="signalHead"><span class="direction '+cls+'">'+esc(d)+'</span><span class="small">'+esc(s.expiry_seconds||30)+'s expiry</span></div>'+
  '<div class="meta"><span class="tag">Stake $'+esc(s.stake)+'</span><span class="tag">Confidence '+esc(s.confidence)+'</span></div>'+
@@ -172,8 +174,8 @@ async function load(){
   setText('hBalance',d.balance!=null?'LIVE':'UNAVAILABLE');document.getElementById('hBalance').className=d.balance!=null?'green':'amber';
   setText('hUpdate',d.updated_at?new Date(d.updated_at*1000).toLocaleTimeString():'--');
   setText('refresh','Updated '+new Date().toLocaleTimeString());
-  setText('sig1','');document.getElementById('sig1').innerHTML=signalHtml(d.last_signals?.['1']||d.last_signals?.[1]);
-  document.getElementById('sig5').innerHTML=signalHtml(d.last_signals?.['5']||d.last_signals?.[5]);
+  setText('sig1','');document.getElementById('sig1').innerHTML=signalHtml(d.last_signals?.['1']||d.last_signals?.[1],d.signal_status?.['1']||d.signal_status?.[1]);
+  document.getElementById('sig5').innerHTML=signalHtml(d.last_signals?.['5']||d.last_signals?.[5],d.signal_status?.['5']||d.signal_status?.[5]);
   drawChart(d.candle_data?.['1']||d.candle_data?.[1]||[]);
  }catch(e){const top=document.getElementById('topStatus');top.className='pill';top.innerHTML='<span class="dot"></span>OFFLINE';}
 }
