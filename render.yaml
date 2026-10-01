@@ -1,12 +1,12 @@
 services:
   - type: web
-    name: dragon-arbitrage-dex
+    name: deriveonlyrender
     runtime: python
     region: frankfurt
     plan: free
-    branch: main
-    buildCommand: python -m pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt && python -m pytest -q tests/test_grpc_testing.py tests/test_admin_server.py
-    startCommand: python dex_cross_exchange_runner.py
+    branch: options-engine-demo
+    buildCommand: python -m pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt && python -m compileall -q options_engine
+    startCommand: python -m options_engine.live_monitor
     autoDeploy: true
     healthCheckPath: /health
     envVars:
@@ -14,121 +14,31 @@ services:
         value: 3.13.4
       - key: PORT
         value: 10000
-      - key: LOG_LEVEL
-        value: INFO
-      - key: DRAGON_ADMIN_ENABLED
-        value: "true"
-      - key: DRAGON_ADMIN_BIND
-        value: "127.0.0.1"
-      - key: DRAGON_ADMIN_PORT
-        value: "50051"
-      - key: DRAGON_ADMIN_TOKEN
+      - key: DERIV_AUTH_TOKEN
         sync: false
-      - key: DEX_CHAINS
-        value: "8453"
-      - key: ALCHEMY_API_KEY
+      - key: DERIV_APP_ID
         sync: false
-      - key: INFURA_API_KEY
+      - key: DERIV_ACCOUNT_ID
         sync: false
-      - key: QUICKNODE_API_KEY
-        sync: false
-      - key: QUICKNODE_ENDPOINT
-        sync: false
-      - key: QUICKNODE_CHAIN_ID
-        sync: false
-      - key: DEX_RPC_URL
-        value: ""
-      - key: DEX_TAKER_ADDRESS
-        value: "0x000000000000000000000000000000000000dEaD"
-      - key: DEX_FLASH_LOAN_LIQUIDITY_QUOTE
-        value: "10000"
-      - key: DEX_MIN_NET_PROFIT
-        value: "0.005"
-      - key: DEX_DYNAMIC_MIN_PROFIT
-        value: "true"
-      - key: DEX_MIN_NET_PROFIT_FLOOR
-        value: "0.005"
-      - key: DEX_MIN_NET_BPS
-        value: "0"
-      - key: DEX_SAFETY_BUFFER
-        value: "0"
-      - key: DEX_GAS_ESTIMATE_MULTIPLIER
-        value: "1.05"
-      - key: DEX_SLIPPAGE_BPS
-        value: "50"
-      - key: DEX_POLL_SECONDS
-        value: "0.25"
-      - key: DEX_QUOTE_CACHE_SECONDS
-        value: "0"
-      - key: DEX_HARD_QUOTE_DEADLINE_MS
-        value: "500"
-      - key: DEX_MAX_QUOTE_AGE_MS
-        value: "500"
-      - key: DEX_QUOTE_CONCURRENCY
-        value: "2"
-      - key: DEX_SELL_CONCURRENCY
-        value: "2"
-      - key: DEX_CANDIDATE_CONCURRENCY
-        value: "2"
-      - key: DEX_RPC_TIMEOUT_SECONDS
-        value: "0.4"
-      - key: DEX_GAS_RPC_URL
-        value: ""
-      - key: DEX_GAS_RPC_URLS
-        value: ""
-      - key: DEX_GAS_RPC_TIMEOUT_SECONDS
-        value: "0.4"
-      - key: DEX_GAS_RPC_MAX_ATTEMPTS
-        value: "4"
-      - key: DEX_GAS_RPC_MAX_INFLIGHT
-        value: "2"
-      - key: DEX_GAS_RPC_COOLDOWN_SECONDS
-        value: "3"
-      - key: DEX_GAS_EXECUTION_OVERHEAD
-        value: "1.10"
-      - key: DEX_NATIVE_TO_QUOTE_RATE
-        value: "0"
-      - key: DEX_RPC_PROVIDER_MAX_INFLIGHT
-        value: "2"
-      - key: DRAGON_BASE_VENUES
-        value: "Aerodrome,Uniswap_V3"
-      - key: DEX_UNIVERSE_REFRESH_SECONDS
-        value: "300"
-      - key: DEX_UNIVERSE_MAX_TOKENS
-        value: "100"
-      - key: DEX_UNIVERSE_LOOKBACK_BLOCKS
-        value: "80000"
-      - key: DEX_UNIVERSE_CHUNK_BLOCKS
-        value: "2000"
-      - key: TRIANGULAR_ARBITRAGE_ENABLED
+      - key: DERIV_ACCOUNT_MODE
+        value: demo
+      - key: DERIV_LIVE_TRADING_ENABLED
         value: "false"
-      - key: DRAGON_CHALLENGE_GAS_BPS
-        value: "2000"
-      - key: DRAGON_CHALLENGE_EXECUTION_BPS
-        value: "100"
-      - key: FREE_RENDER_HEALTH_PING_MINUTES
-        value: "5"
-      - key: AMPLITUDE_ENABLED
+      - key: DERIV_SYMBOL
+        value: 1HZ100V
+      - key: DERIV_WS_TIMEOUT
+        value: "12"
+      - key: OPTIONS_MODE
+        value: paper
+      - key: OPTIONS_DRY_RUN
         value: "true"
-      - key: AMPLITUDE_API_KEY
-        sync: false
-      - key: AMPLITUDE_ENDPOINT
-        value: "https://api2.amplitude.com/2/httpapi"
-      - key: FLASH_LOAN_ENABLED
-        value: "true"
-      - key: FLASH_LOAN_FEE_BPS
-        value: "5"
-      - key: MEV_PROTECTION_REQUIRED
-        value: "true"
-      - key: DEX_COMPOUND_PROFITS
+      - key: OPTIONS_TIMEFRAMES
+        value: "1,5"
+      - key: OPTIONS_STAKE_1M
+        value: "0.5"
+      - key: OPTIONS_STAKE_5M
+        value: "2"
+      - key: OPTIONS_MARTINGALE
         value: "false"
-      - key: DEX_COMPOUND_RATIO
-        value: "1"
-      - key: DEX_MAX_COMPOUND_QUOTE
-        value: "0"
-      - key: ATOMIC_REPAYMENT_REQUIRED
-        value: "true"
-      - key: LIVE_TRADING
-        value: "false"
-      - key: DRY_RUN
+      - key: DERIV_AUTO_EXECUTE
         value: "true"
