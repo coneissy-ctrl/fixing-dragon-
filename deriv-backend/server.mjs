@@ -53,7 +53,15 @@ function randomState() {
 }
 
 function authToken() {
-  return DERIV_PAT || session?.accessToken || "";
+  const pat = String(DERIV_PAT || "").trim();
+  const oauth = String(session?.accessToken || "").trim();
+  return pat || oauth || "";
+}
+
+function authMode() {
+  if (String(DERIV_PAT || "").trim()) return "pat";
+  if (session?.accessToken) return "oauth";
+  return "none";
 }
 
 async function derivFetch(path, options = {}) {
@@ -136,7 +144,15 @@ async function handle(req, res) {
   const url = new URL(req.url, "http://localhost");
 
   if (url.pathname === "/health") {
-    return json(res, 200, { ok: true, service: "dragon-deriv-options-engine", connected: !!authToken(), auth_mode: DERIV_PAT ? "pat" : (session ? "oauth" : "none") });
+    return json(res, 200, {
+      ok: true,
+      service: "dragon-deriv-options-engine",
+      connected: !!authToken(),
+      auth_mode: authMode(),
+      pat_configured: !!String(DERIV_PAT || "").trim(),
+      app_id_configured: !!String(DERIV_APP_ID || "").trim(),
+      live_execution_enabled: LIVE_EXECUTION_ENABLED,
+    });
   }
 
   if (url.pathname === "/oauth/deriv/start" && req.method === "GET") {
@@ -210,7 +226,7 @@ async function handle(req, res) {
         loginid: account.loginId,
         account_type: account.accountType,
         currency: balance?.balance?.currency || account.currency,
-        auth_mode: DERIV_PAT ? "pat" : "oauth",
+        auth_mode: authMode(),
         scopes: ["trade"],
         live_execution_enabled: LIVE_EXECUTION_ENABLED && account.accountType === "real",
         expires_at: DERIV_PAT ? null : (session?.expiresAt ? new Date(session.expiresAt).toISOString() : null),
@@ -221,7 +237,12 @@ async function handle(req, res) {
   }
 
   if (!authOK(req)) return json(res, 401, { error: "unauthorized" });
-  if (!authToken()) return json(res, 401, { error: "deriv_not_connected" });
+  if (!authToken()) return json(res, 401, {
+    error: "deriv_not_connected",
+    auth_mode: authMode(),
+    pat_configured: !!String(DERIV_PAT || "").trim(),
+    app_id_configured: !!String(DERIV_APP_ID || "").trim(),
+  });
 
   if (url.pathname === "/api/deriv/balance" && req.method === "GET") {
     const account = await connectedAccount();
