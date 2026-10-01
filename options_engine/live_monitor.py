@@ -16,7 +16,7 @@ from typing import Any
 
 from .adapters.deriv import DerivOptionsDemo, DerivAdapterError, DERIV_MCP_URL
 from .candles import CandleAggregator
-from .strategy import BinaryStrategy
+from .strategy import BinaryStrategy, RSIMeanReversionStrategy
 from .dashboard import DashboardState, serve_dashboard
 from .analytics import AmplitudeAnalytics
 
@@ -32,6 +32,11 @@ class LiveMonitor:
         )
         self.aggregators = {1: CandleAggregator(1), 5: CandleAggregator(5)}
         self.strategies = {1: BinaryStrategy(1), 5: BinaryStrategy(5)}
+        self.fallback_strategies = {1: RSIMeanReversionStrategy(1), 5: RSIMeanReversionStrategy(5)}
+        self.active_algorithm = {1: "primary", 5: "primary"}
+        self.win_multiplier = Decimal(os.getenv("DERIV_WIN_MULTIPLIER", "1.5"))
+        self.base_stakes = dict(self.stakes)
+        self.algorithm_searching = {1: False, 5: False}
         self.candles: dict[int, list[Any]] = {1: [], 5: []}
         self.stakes = {1: Decimal("0.5"), 5: Decimal("2")}
         self.oauth_client_id = os.getenv("DERIV_CLIENT_ID")
@@ -145,9 +150,63 @@ class LiveMonitor:
                 self.state.last_signals[signal.timeframe_minutes]["execution"] = order
                 print(f"DERIV_AUTO_EXECUTED contract_id={order.get('contract_id')} symbol={signal.symbol} direction={signal.direction} stake={signal.stake} expiry={signal.expiry_seconds}s", flush=True)
                 await self._refresh_balance()
+                asyncio.create_task(self._monitor_contract(order, signal))
             except Exception as exc:
                 self.state.last_signals[signal.timeframe_minutes]["execution_error"] = f"{type(exc).__name__}: {exc}"
                 print(f"DERIV_AUTO_EXECUTION_ERROR type={type(exc).__name__} error={exc}", flush=True)
+
+    async def _monitor_contract(self, order: dict[str, Any], signal: Any) -> None:
+        contract_id = order.get("contract_id")
+        if not contract_id:
+            return
+        try:
+            await asyncio.sleep(max(1, int(signal.expiry_seconds) + 2))
+            status = await self.adapter.contract_status(str(contract_id))
+            profit_raw = status.get("profit")
+            profit = Decimal(str(profit_raw)) if profit_raw is not None else None
+            is_won = str(status.get("status", "")).lower() == "won" or (
+                profit is not None and profit > 0
+            )
+            result = "won" if is_won else "lost"
+            self.analytics.track(
+                "deriv_option_result",
+                event_properties={
+                    "symbol": signal.symbol,
+                    "direction": signal.direction,
+                    "stake": float(signal.stake),
+                    "timeframe_minutes": signal.timeframe_minutes,
+                    "contract_id_present": True,
+                    "result": result,
+                    "profit": float(profit) if profit is not None else None,
+                    "algorithm": self.active_algorithm.get(signal.timeframe_minutes, "unknown"),
+                },
+            )
+            if is_won:
+                next_stake = signal.stake * self.win_multiplier
+                self.stakes[signal.timeframe_minutes] = next_stake
+                print(
+                    f"DERIV_RESULT WON contract_id={contract_id} stake={signal.stake} "
+                    f"next_stake={next_stake} multiplier={self.win_multiplier}",
+                    flush=True,
+                )
+            else:
+                tf = signal.timeframe_minutes
+                self.stakes[tf] = self.base_stakes[tf]
+                self.auto_execute = False
+                self.algorithm_searching[tf] = True
+                self.active_algorithm[tf] = "searching_after_loss"
+                self.state.last_signals[tf]["execution_result"] = "LOST_STOPPED_SEARCHING"
+                print(
+                    f"DERIV_RESULT LOST contract_id={contract_id} "
+                    f"action=STOP_NEW_TRADES algorithm_search=1",
+                    flush=True,
+                )
+        except Exception as exc:
+            print(
+                f"DERIV_CONTRACT_RESULT_ERROR contract_id={contract_id} "
+                f"type={type(exc).__name__} error={exc}",
+                flush=True,
+            )
 
     async def _refresh_balance(self) -> None:
         try:
@@ -353,10 +412,17 @@ class LiveMonitor:
                 self.candles[tf] = self.candles[tf][-80:]
                 self.state.candle_data[tf] = [asdict(c) for c in self.candles[tf]]
                 self.state.candles[tf] += 1
-                signal = self.strategies[tf].generate(
+                strategy = self.fallback_strategies[tf] if self.algorithm_searching[tf] else self.strategies[tf]
+                signal = strategy.generate(
                     self.symbol, self.candles[tf], self.stakes[tf]
                 )
                 if signal:
+                    if self.algorithm_searching[tf]:
+                        self.algorithm_searching[tf] = False
+                        self.active_algorithm[tf] = "fallback_rsi_mean_reversion"
+                        self.auto_execute = True
+                        self.stakes[tf] = self.base_stakes[tf]
+                        print(f"DERIV_ALGORITHM_SELECTED tf={tf} algorithm=RSI_MEAN_REVERSION action=RESUME", flush=True)
                     self.state.signals[tf] += 1
                     self.state.last_signals[tf] = {
                         "direction": signal.direction,
