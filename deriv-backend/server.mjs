@@ -9,6 +9,137 @@ const REDIRECT_URI = process.env.DERIV_REDIRECT_URI || "";
 const API_KEY = process.env.DERIV_BACKEND_API_KEY || "";
 const LIVE_EXECUTION_ENABLED = process.env.DERIV_LIVE_EXECUTION_ENABLED === "true";
 
+const TRADING_CONFIG = Object.freeze({
+  stake: 0.50,
+  timeframeMinutes: 5,
+  expiryMinutes: 5,
+  confidenceMin: 80,
+  maxEntries: 5,
+  maxRecoveryAttempts: 1,
+  thirdMartingale: false,
+  newsTrading: false,
+  superHighVolatility: false,
+  drawdownStopPct: 30,
+  liveExecution: false,
+  entrySeconds: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55],
+  watchlist: [
+    "frxEURUSD","frxGBPUSD","frxUSDJPY","frxAUDUSD","frxUSDCAD",
+    "frxUSDCHF","frxEURGBP","frxEURJPY","frxGBPJPY","frxXAUUSD",
+    "R_10","R_25","R_50","R_75","R_100","1HZ10V","1HZ25V","1HZ50V","1HZ75V","1HZ100V"
+  ],
+});
+
+const paperSession = {
+  startedAt: new Date().toISOString(),
+  entries: 0,
+  wins: 0,
+  losses: 0,
+  recoveryAttempts: 0,
+  pnl: 0,
+  peakEquity: 0,
+  hardStopped: false,
+  lastEntry: null,
+  signals: [],
+};
+
+const candleCache = new Map();
+
+async function marketRequest(payload, timeoutMs = 8000) {
+  return wsRequest("wss://ws.derivws.com/websockets/v3?app_id=" + encodeURIComponent(DERIV_APP_ID || "1089"), payload, timeoutMs);
+}
+
+async function getCandles(symbol, count = 60) {
+  const result = await marketRequest({
+    ticks_history: symbol,
+    style: "candles",
+    granularity: 300,
+    count,
+    end: "latest",
+  });
+  const candles = result?.candles || [];
+  if (candles.length) candleCache.set(symbol, candles);
+  return candles;
+}
+
+function calcSignal(candles) {
+  if (candles.length < 30) return { direction: null, confidence: 0, reason: "insufficient_data" };
+  const closes = candles.map(c => Number(c.close));
+  const ema = (period) => {
+    const k = 2 / (period + 1);
+    let e = closes[0];
+    for (let i = 1; i < closes.length; i++) e = closes[i] * k + e * (1 - k);
+    return e;
+  };
+  const e9 = ema(9), e21 = ema(21);
+  const gains = [], losses = [];
+  for (let i = 1; i < closes.length; i++) {
+    const d = closes[i] - closes[i - 1];
+    gains.push(Math.max(d, 0)); losses.push(Math.max(-d, 0));
+  }
+  const avgGain = gains.slice(-14).reduce((a,b)=>a+b,0) / 14;
+  const avgLoss = losses.slice(-14).reduce((a,b)=>a+b,0) / 14;
+  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  const rsi = 100 - (100 / (1 + rs));
+  const last = closes[closes.length - 1];
+  const momentum = closes[closes.length - 1] - closes[closes.length - 4];
+  let score = 50;
+  let direction = null;
+  if (e9 > e21) { direction = "CALL"; score += 20; }
+  if (e9 < e21) { direction = "PUT"; score += 20; }
+  if (direction === "CALL" && rsi >= 50 && rsi <= 70) score += 15;
+  if (direction === "PUT" && rsi <= 50 && rsi >= 30) score += 15;
+  if (direction === "CALL" && momentum > 0) score += 10;
+  if (direction === "PUT" && momentum < 0) score += 10;
+  const confidence = Math.min(99, Math.round(score));
+  return { direction, confidence, rsi: Number(rsi.toFixed(2)), price: last, ema9: e9, ema21: e21 };
+}
+
+async function scanWatchlist() {
+  const results = [];
+  for (const symbol of TRADING_CONFIG.watchlist) {
+    try {
+      const candles = await getCandles(symbol);
+      const signal = calcSignal(candles);
+      results.push({ symbol, ...signal, eligible: signal.confidence >= TRADING_CONFIG.confidenceMin });
+    } catch (e) {
+      results.push({ symbol, eligible: false, confidence: 0, error: e.message });
+    }
+  }
+  paperSession.signals = results;
+  return results;
+}
+
+function isEntryTime(date = new Date()) {
+  return TRADING_CONFIG.entrySeconds.includes(date.getSeconds()) && date.getMilliseconds() < 1500;
+}
+
+function drawdownPct() {
+  const peak = Math.max(0.01, paperSession.peakEquity);
+  return Math.max(0, ((peak - Math.min(peak, paperSession.pnl)) / peak) * 100);
+}
+
+async function paperCycle() {
+  if (paperSession.hardStopped) return;
+  if (!isEntryTime()) return;
+  if (paperSession.entries >= TRADING_CONFIG.maxEntries) return;
+  const signals = await scanWatchlist();
+  const candidates = signals.filter(s => s.eligible && (s.direction === "CALL" || s.direction === "PUT"));
+  candidates.sort((a,b) => b.confidence - a.confidence);
+  const pick = candidates[0];
+  if (!pick) return;
+  paperSession.entries += 1;
+  paperSession.lastEntry = {
+    at: new Date().toISOString(),
+    symbol: pick.symbol,
+    direction: pick.direction,
+    stake: TRADING_CONFIG.stake,
+    expiryMinutes: TRADING_CONFIG.expiryMinutes,
+    confidence: pick.confidence,
+    mode: "paper",
+  };
+  paperSession.peakEquity = Math.max(paperSession.peakEquity, paperSession.pnl + TRADING_CONFIG.stake);
+}
+
 const states = new Map();
 let session = null;
 
@@ -59,6 +190,14 @@ function startExecutor() {
 }
 
 startExecutor();
+const PAPER_SCAN_INTERVAL_MS = 1000;
+let paperTimer = null;
+function startPaperEngine() {
+  if (paperTimer) return;
+  paperTimer = setInterval(() => paperCycle().catch(() => {}), PAPER_SCAN_INTERVAL_MS);
+}
+startPaperEngine();
+
 
 function json(res, status, body) {
   res.writeHead(status, {
@@ -190,6 +329,39 @@ async function callbackRedirect(returnTo, params) {
 async function handle(req, res) {
   if (req.method === "OPTIONS") return json(res, 204, {});
   const url = new URL(req.url, "http://localhost");
+
+  if (url.pathname === "/api/deriv/config" && req.method === "GET") {
+    return json(res, 200, { ...TRADING_CONFIG, mode: "paper", live_execution_enabled: false });
+  }
+
+  if (url.pathname === "/api/deriv/session" && req.method === "GET") {
+    return json(res, 200, {
+      ...paperSession,
+      drawdown_pct: Number(drawdownPct().toFixed(2)),
+      remaining_entries: Math.max(0, TRADING_CONFIG.maxEntries - paperSession.entries),
+      next_entry_window: TRADING_CONFIG.entrySeconds,
+      mode: "paper",
+      live_execution_enabled: false,
+    });
+  }
+
+  if (url.pathname === "/api/deriv/signals" && req.method === "GET") {
+    try {
+      const signals = await scanWatchlist();
+      return json(res, 200, { generatedAt: new Date().toISOString(), signals, config: TRADING_CONFIG });
+    } catch (e) {
+      return json(res, 502, { error: e.message });
+    }
+  }
+
+  if (url.pathname === "/api/deriv/paper/cycle" && req.method === "POST") {
+    try {
+      await paperCycle();
+      return json(res, 200, { ok: true, session: paperSession, config: TRADING_CONFIG });
+    } catch (e) {
+      return json(res, 502, { error: e.message });
+    }
+  }
 
   if (url.pathname === "/api/deriv/executor/status" && req.method === "GET") {
     return json(res, 200, { ...executorState, intervalMs: EXECUTOR_INTERVAL_MS });
