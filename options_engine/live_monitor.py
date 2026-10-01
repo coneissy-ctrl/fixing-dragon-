@@ -18,6 +18,7 @@ from .adapters.deriv import DerivOptionsDemo, DerivAdapterError, DERIV_MCP_URL
 from .candles import CandleAggregator
 from .strategy import BinaryStrategy
 from .dashboard import DashboardState, serve_dashboard
+from .analytics import AmplitudeAnalytics
 
 
 class LiveMonitor:
@@ -48,6 +49,8 @@ class LiveMonitor:
         self.last_execution_at = 0.0
         self.min_balance_buffer = Decimal(os.getenv("DERIV_MIN_BALANCE_BUFFER", "0"))
         self.auto_execute = os.getenv("DERIV_AUTO_EXECUTE", "true").lower() == "true"
+        self.analytics = AmplitudeAnalytics()
+        self.analytics.start()
 
     def _sync_account_state(self) -> None:
         self.state.account_id = self.adapter.account_id
@@ -127,6 +130,18 @@ class LiveMonitor:
                     duration_seconds=signal.expiry_seconds,
                 )
                 self.last_execution_at = now
+                self.analytics.track(
+                    "deriv_option_executed",
+                    event_properties={
+                        "symbol": signal.symbol,
+                        "direction": signal.direction,
+                        "stake": float(signal.stake),
+                        "expiry_seconds": signal.expiry_seconds,
+                        "timeframe_minutes": signal.timeframe_minutes,
+                        "confidence": float(signal.confidence),
+                        "contract_id_present": bool(order.get("contract_id")),
+                    },
+                )
                 self.state.last_signals[signal.timeframe_minutes]["execution"] = order
                 print(f"DERIV_AUTO_EXECUTED contract_id={order.get('contract_id')} symbol={signal.symbol} direction={signal.direction} stake={signal.stake} expiry={signal.expiry_seconds}s", flush=True)
                 await self._refresh_balance()
@@ -352,6 +367,18 @@ class LiveMonitor:
                         "reason": signal.reason,
                         "analysis": signal.analysis or {},
                     }
+                    self.analytics.track(
+                        "deriv_option_signal",
+                        event_properties={
+                            "symbol": signal.symbol,
+                            "direction": signal.direction,
+                            "timeframe_minutes": signal.timeframe_minutes,
+                            "expiry_seconds": signal.expiry_seconds,
+                            "stake": float(signal.stake),
+                            "confidence": float(signal.confidence),
+                            "reason": signal.reason,
+                        },
+                    )
                     await self._execute_signal(signal)
             self.state.updated_at = time.time()
 
@@ -363,6 +390,7 @@ class LiveMonitor:
             except asyncio.CancelledError:
                 pass
             self.balance_task = None
+        await self.analytics.close()
         await self.adapter.close()
 
 
