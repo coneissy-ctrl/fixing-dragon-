@@ -50,7 +50,7 @@ class DashboardState:
             "account_mode": self.account_mode, "live_execution_enabled": self.live_execution_enabled,
             "balance": self.balance, "balance_updated_at": self.balance_updated_at,
             "balance_error": self.balance_error, "auth_error": self.auth_error,
-            "stakes": {"1m": "0.50", "5m": "2.00"}, "martingale": False,
+            "stakes": {"30s": "0.25", "1m": "0.25", "5m": "2.00"}, "martingale": False,
         }
 
 
@@ -85,7 +85,7 @@ body{margin:0;background:#07111d;color:#edf5ff;font:14px system-ui;padding:20px}
 <div class="card"><div class="muted">Deriv account</div>
 <div><a href="/auth/deriv/login">CONNECT DERIV ACCOUNT</a></div>
 <div id="account">Not authenticated</div><div id="authmsg">OAuth authorization is required before account-scoped operations.</div>
-<div>Configured stakes: 1m = $0.50 - 5m = $2.00 - Martingale = OFF</div></div>
+<div>Configured stakes: 30s = $0.25 - 1m = $0.25 - 5m = $2.00 - Martingale = OFF</div></div>
 <div class="card"><div class="muted">Latest signals</div><div id="signals">Waiting for completed candles...</div></div>
 </div>
 <script>
