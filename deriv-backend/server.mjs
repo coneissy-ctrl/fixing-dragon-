@@ -65,8 +65,11 @@ async function derivFetch(path, options = {}) {
 
 async function getOtpUrl(accountId) {
   const r = await derivFetch(`/trading/v1/options/accounts/${encodeURIComponent(accountId)}/otp`, { method: "POST" });
-  const data = await r.json();
-  if (!r.ok || !data?.data?.url) throw new Error("Deriv OTP generation failed");
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok || !data?.data?.url) {
+    const detail = data?.errors?.[0]?.message || data?.error?.message || data?.message || `HTTP ${r.status}`;
+    throw new Error(`Deriv OTP generation failed: ${detail}`);
+  }
   return data.data.url;
 }
 
@@ -129,8 +132,8 @@ async function handle(req, res) {
 
   if (url.pathname === "/oauth/deriv/start" && req.method === "GET") {
     if (!CLIENT_ID || !REDIRECT_URI) return json(res, 503, { error: "Deriv OAuth is not configured" });
-    const returnTo = url.searchParams.get("return_to");
-    if (!returnTo) return json(res, 400, { error: "return_to is required" });
+    const returnTo = url.searchParams.get("return_to") || process.env.OAUTH_RETURN_TO || process.env.FRONTEND_ORIGIN;
+    if (!returnTo) return json(res, 400, { error: "return_to is required; set OAUTH_RETURN_TO or FRONTEND_ORIGIN" });
     const scope = url.searchParams.get("scope") || "trade";
     const state = randomState();
     const verifier = pkceVerifier();
@@ -154,7 +157,11 @@ async function handle(req, res) {
       return json(res, 400, { error: "invalid_state" });
     }
     states.delete(state);
-    if (!code) return redirect(res, await callbackRedirect(pending.returnTo, { error: "missing_code" }));
+    if (!code) {
+      const error = url.searchParams.get("error") || "missing_code";
+      const detail = url.searchParams.get("error_description") || "";
+      return redirect(res, await callbackRedirect(pending.returnTo, { error, detail }));
+    }
 
     const tokenBody = new URLSearchParams({
       grant_type: "authorization_code",
@@ -169,12 +176,17 @@ async function handle(req, res) {
       headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
       body: tokenBody,
     });
-    const token = await tokenRes.json();
+    const token = await tokenRes.json().catch(() => ({}));
     if (!tokenRes.ok || !token.access_token) {
-      return redirect(res, await callbackRedirect(pending.returnTo, { error: "token_exchange_failed" }));
+      console.error("Deriv OAuth token exchange failed:", JSON.stringify(token));
+      return redirect(res, await callbackRedirect(pending.returnTo, {
+        error: "token_exchange_failed",
+        detail: token?.error_description || token?.error || `HTTP ${tokenRes.status}`,
+      }));
     }
 
     session = { accessToken: token.access_token, expiresAt: Date.now() + Number(token.expires_in || 3600) * 1000 };
+    console.log("Deriv OAuth authorization completed successfully");
     return redirect(res, await callbackRedirect(pending.returnTo, { status: "success" }));
   }
 
