@@ -134,3 +134,65 @@ class BinaryStrategy:
 class Strategy(BinaryStrategy):
     def __init__(self, timeframe_minutes: int = 1):
         super().__init__(timeframe_minutes)
+
+
+class RSIMeanReversionStrategy(BinaryStrategy):
+    """Fallback Gold algorithm used only after the primary strategy is paused.
+
+    It looks for RSI extremes near recent support/resistance and requires
+    candle rejection. It is intentionally conservative.
+    """
+
+    def generate(self, symbol: str, candles: list[Candle], stake: Decimal) -> Optional[Signal]:
+        minimum = 35 if self.timeframe_minutes == 1 else 30
+        if len(candles) < minimum or stake <= 0:
+            return None
+        current = candles[-1]
+        if self._last_signal_candle == current.timestamp:
+            return None
+        closes = [c.close for c in candles]
+        rsi = self._rsi(closes, 14)
+        atr = self._atr(candles)
+        if atr <= 0:
+            return None
+        recent = candles[-20:]
+        support = min(c.low for c in recent)
+        resistance = max(c.high for c in recent)
+        body = abs(current.close - current.open)
+        lower_wick = min(current.open, current.close) - current.low
+        upper_wick = current.high - max(current.open, current.close)
+
+        bullish_rejection = (
+            rsi <= 32 and current.close > current.open
+            and lower_wick >= max(body, atr * 0.20)
+            and current.close <= support + atr * 0.75
+        )
+        bearish_rejection = (
+            rsi >= 68 and current.close < current.open
+            and upper_wick >= max(body, atr * 0.20)
+            and current.close >= resistance - atr * 0.75
+        )
+        if not (bullish_rejection or bearish_rejection):
+            return None
+
+        direction = "CALL" if bullish_rejection else "PUT"
+        confidence = Decimal("0.55") + Decimal(
+            str(min(abs(rsi - 50.0) / 100.0, 0.25))
+        )
+        self._last_signal_candle = current.timestamp
+        return Signal(
+            symbol=symbol,
+            direction=direction,
+            stake=stake,
+            confidence=min(confidence, Decimal("0.80")),
+            timeframe_minutes=self.timeframe_minutes,
+            expiry_seconds=self.timeframe_minutes * 60,
+            candle_timestamp=current.timestamp,
+            reason=f"{self.timeframe_minutes}m RSI mean-reversion + S/R rejection",
+            analysis={
+                "rsi": round(rsi, 2),
+                "atr": round(atr, 6),
+                "support": round(support, 6),
+                "resistance": round(resistance, 6),
+            },
+        )
