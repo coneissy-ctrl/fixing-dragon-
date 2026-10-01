@@ -53,7 +53,7 @@ function randomState() {
 }
 
 function authToken() {
-  return session?.accessToken || (DERIV_PAT ? DERIV_PAT : "");
+  return DERIV_PAT || session?.accessToken || "";
 }
 
 async function derivFetch(path, options = {}) {
@@ -104,9 +104,13 @@ async function wsRequest(url, payload, timeoutMs = 10000) {
 
 async function accounts() {
   const r = await derivFetch("/trading/v1/options/accounts");
-  const data = await r.json();
-  if (!r.ok) throw new Error("Unable to read Deriv accounts");
-  return data?.data?.accounts || data?.accounts || [];
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const detail = data?.errors?.[0]?.message || data?.error?.message || data?.message || `HTTP ${r.status}`;
+    throw new Error(`Unable to read Deriv accounts: ${detail}`);
+  }
+  const accounts = data?.data?.accounts || data?.accounts || data?.data || [];
+  return Array.isArray(accounts) ? accounts : [accounts].filter(Boolean);
 }
 
 async function connectedAccount() {
@@ -132,7 +136,7 @@ async function handle(req, res) {
   const url = new URL(req.url, "http://localhost");
 
   if (url.pathname === "/health") {
-    return json(res, 200, { ok: true, service: "dragon-deriv-options-engine", connected: !!session });
+    return json(res, 200, { ok: true, service: "dragon-deriv-options-engine", connected: !!authToken(), auth_mode: DERIV_PAT ? "pat" : (session ? "oauth" : "none") });
   }
 
   if (url.pathname === "/oauth/deriv/start" && req.method === "GET") {
@@ -196,7 +200,7 @@ async function handle(req, res) {
 
   if (url.pathname === "/oauth/deriv/status" && req.method === "GET") {
     if (!authOK(req)) return json(res, 401, { error: "unauthorized" });
-    if (!authToken()) return json(res, 200, { connected: false });
+    if (!authToken()) return json(res, 200, { connected: false, auth_mode: "none" });
     try {
       const account = await connectedAccount();
       const wsUrl = await getOtpUrl(account.accountId);
@@ -206,9 +210,10 @@ async function handle(req, res) {
         loginid: account.loginId,
         account_type: account.accountType,
         currency: balance?.balance?.currency || account.currency,
+        auth_mode: DERIV_PAT ? "pat" : "oauth",
         scopes: ["trade"],
         live_execution_enabled: LIVE_EXECUTION_ENABLED && account.accountType === "real",
-        expires_at: new Date(session.expiresAt).toISOString(),
+        expires_at: DERIV_PAT ? null : (session?.expiresAt ? new Date(session.expiresAt).toISOString() : null),
       });
     } catch (e) {
       return json(res, 200, { connected: false, error: e.message });
