@@ -16,7 +16,7 @@ from typing import Any
 
 from .adapters.deriv import DerivOptionsDemo, DerivAdapterError, DERIV_MCP_URL
 from .candles import CandleAggregator
-from .strategy import BinaryStrategy, RSIMeanReversionStrategy
+from .strategy import BinaryStrategy, RSIMeanReversionStrategy, Candle
 from .dashboard import DashboardState, serve_dashboard
 from .analytics import AmplitudeAnalytics
 
@@ -397,6 +397,33 @@ class LiveMonitor:
         if self.state.status == "CONNECTING":
             self.state.status = "LIVE_DATA"
         self.state.connected_at = time.time()
+
+        # Warm the technical-analysis engine with completed live-market candles.
+        # Without this, the monitor must wait for 35+ new 1m candles before it can
+        # evaluate the strategy, which looks like a dead entry engine after restart.
+        for tf, granularity in ((1, 60), (5, 300)):
+            try:
+                rows = await self.adapter.historical_candles(self.symbol, granularity, 80)
+                seeded = []
+                for row in rows:
+                    try:
+                        from .strategy import Candle
+                        seeded.append(Candle(
+                            timestamp=int(row.get("epoch", row.get("open_time", 0))),
+                            open=float(row["open"]),
+                            high=float(row["high"]),
+                            low=float(row["low"]),
+                            close=float(row["close"]),
+                        ))
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                if seeded:
+                    self.candles[tf] = seeded[-80:]
+                    self.state.candle_data[tf] = [asdict(c) for c in self.candles[tf]]
+                    self.state.candles[tf] = len(self.candles[tf])
+                    print(f"DERIV_CANDLE_WARMUP tf={tf} candles={len(self.candles[tf])}", flush=True)
+            except Exception as exc:
+                print(f"DERIV_CANDLE_WARMUP_ERROR tf={tf} type={type(exc).__name__} error={exc}", flush=True)
 
         async for tick in self.adapter.ticks(self.symbol):
             if self.state.tick_count == 0:
