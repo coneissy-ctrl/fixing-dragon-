@@ -26,7 +26,7 @@ PUBLIC_WS = "wss://api.derivws.com/trading/v1/options/ws/public"
 DEMO_WS_MARKER = "/trading/v1/options/ws/demo"
 REAL_WS_MARKER = "/trading/v1/options/ws/real"
 DERIV_MCP_URL = "https://mcp-api.deriv.com/mcp"
-FIXED_STAKES = {60: Decimal("0.5"), 300: Decimal("2")}
+FIXED_STAKES = {30: Decimal("0.5"), 60: Decimal("0.5"), 300: Decimal("2")}
 DEFAULT_MAX_STAKES = {60: Decimal(os.getenv("DERIV_MAX_STAKE_1M", "5")), 300: Decimal(os.getenv("DERIV_MAX_STAKE_5M", "10"))}
 
 
@@ -373,7 +373,7 @@ class DerivOptionsDemo(ExecutionAdapter):
         if stake <= 0:
             raise ValueError("stake must be positive")
         if duration_seconds not in FIXED_STAKES:
-            raise ValueError("duration_seconds must be 60 or 300")
+            raise ValueError("duration_seconds must be 30, 60 or 300")
         minimum_stake = FIXED_STAKES[duration_seconds]
         maximum_stake = DEFAULT_MAX_STAKES[duration_seconds]
         if stake < minimum_stake:
