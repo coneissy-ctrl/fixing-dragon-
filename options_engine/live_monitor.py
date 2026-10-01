@@ -373,17 +373,64 @@ class LiveMonitor:
             if candidate and candidate not in candidates:
                 candidates.append(candidate)
 
+        # Choose an underlying that actually supports the strategy's expiry.
+        # Gold remains preferred, but Deriv can restrict regular-options durations
+        # by instrument. The previous fixed XAUUSD selection allowed a signal to
+        # reach BUY and fail with ContractBuyValidationError.
+        required_expiry = int(os.getenv("DERIV_ENTRY_EXPIRY_SECONDS", "60"))
+        preferred = candidates + [
+            "R_50", "R_100", "R_75", "R_25", "R_10",
+            "1HZ10V", "1HZ25V", "1HZ50V", "1HZ75V", "1HZ100V",
+        ]
         selected = None
-        for candidate in candidates:
-            if candidate not in available:
+        selected_contracts = []
+        checked = set()
+        for candidate in preferred:
+            if not candidate or candidate in checked or candidate not in available:
                 continue
+            checked.add(candidate)
             try:
                 contracts = await self.adapter.contracts_for(candidate)
-                if any(str(x.get("contract_type", "")).upper() in {"CALL", "PUT"} for x in contracts):
-                    selected = candidate
-                    break
             except DerivAdapterError:
                 continue
+            callput = [
+                x for x in contracts
+                if str(x.get("contract_type", "")).upper() in {"CALL", "PUT"}
+            ]
+            for contract in callput:
+                def _seconds(value):
+                    try:
+                        text = str(value).strip().lower()
+                        units = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+                        for suffix, multiplier in units.items():
+                            if text.endswith(suffix):
+                                return float(text[:-1]) * multiplier
+                        return float(text)
+                    except Exception:
+                        return None
+
+                min_s = _seconds(contract.get("min_contract_duration"))
+                max_s = _seconds(contract.get("max_contract_duration"))
+                if (
+                    min_s is None or max_s is None
+                    or min_s <= required_expiry <= max_s
+                ):
+                    selected = candidate
+                    selected_contracts = callput
+                    break
+            if selected:
+                break
+
+        if selected is None:
+            raise RuntimeError(
+                f"No CALL/PUT instrument supports {required_expiry}s expiry "
+                f"(requested={self.symbol}, received={len(available)})"
+            )
+        print(
+            f"DERIV_INSTRUMENT selected={selected} expiry={required_expiry}s "
+            f"call_put_contracts={len(selected_contracts)}",
+            flush=True,
+        )
         if selected is None:
             raise RuntimeError(
                 "No supported tick symbol found in Deriv active_symbols "
