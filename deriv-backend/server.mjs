@@ -2,7 +2,9 @@ import http from "node:http";
 import crypto from "node:crypto";
 
 const PORT = Number(process.env.PORT || 10000);
-const CLIENT_ID = process.env.DERIV_CLIENT_ID || process.env.DERIV_APP_ID || "";\nconst DERIV_PAT = process.env.DERIV_PAT || "";\nconst DERIV_APP_ID = process.env.DERIV_APP_ID || CLIENT_ID || "";
+const CLIENT_ID = process.env.DERIV_CLIENT_ID || process.env.DERIV_APP_ID || "";
+const DERIV_PAT = process.env.DERIV_PAT || "";
+const DERIV_APP_ID = process.env.DERIV_APP_ID || CLIENT_ID || "";
 const REDIRECT_URI = process.env.DERIV_REDIRECT_URI || "";
 const API_KEY = process.env.DERIV_BACKEND_API_KEY || "";
 const LIVE_EXECUTION_ENABLED = process.env.DERIV_LIVE_EXECUTION_ENABLED === "true";
